@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.conversation.web;
 
 import com.kzzz3.argus.cortex.conversation.application.ConversationApplicationService;
 import java.util.List;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,20 @@ public class ConversationController {
 		return conversationApplicationService.listConversations(extractBearerToken(authorizationHeader))
 				.stream()
 				.map(ConversationSummaryResponse::from)
+				.toList();
+	}
+
+	@GetMapping("/{conversationId}/messages")
+	public List<ConversationMessageResponse> listMessages(
+			@PathVariable String conversationId,
+			@RequestHeader("Authorization") String authorizationHeader
+	) {
+		return conversationApplicationService.listMessages(
+				extractBearerToken(authorizationHeader),
+				conversationId
+		)
+				.stream()
+				.map(ConversationMessageResponse::from)
 				.toList();
 	}
 
