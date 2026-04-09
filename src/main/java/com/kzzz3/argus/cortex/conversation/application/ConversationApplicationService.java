@@ -13,22 +13,26 @@ import org.springframework.stereotype.Service;
 @Service
 public class ConversationApplicationService {
 
+	private static final int DEFAULT_RECENT_WINDOW_DAYS = 7;
+	private static final int DEFAULT_MESSAGE_LIMIT = 50;
+
 	private final AccessTokenStore accessTokenStore;
 
 	public ConversationApplicationService(AccessTokenStore accessTokenStore) {
 		this.accessTokenStore = accessTokenStore;
 	}
 
-	public List<ConversationSummary> listConversations(String accessToken) {
+	public List<ConversationSummary> listConversations(String accessToken, int recentWindowDays) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
 
 		return List.of(
 				new ConversationSummary(
 						"conv-zhang-san",
 						"Zhang San",
 						"1:1 direct chat",
-						"Remote inbox is now wired from argus-cortex.",
+						"Remote inbox keeps only the latest " + normalizedWindowDays + " days in server scope.",
 						"09:24",
 						2
 				),
@@ -51,17 +55,19 @@ public class ConversationApplicationService {
 		);
 	}
 
-	public List<ConversationMessage> listMessages(String accessToken, String conversationId) {
+	public List<ConversationMessage> listMessages(String accessToken, String conversationId, int recentWindowDays, int limit) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
+		int normalizedLimit = normalizeMessageLimit(limit);
 
-		return switch (conversationId) {
+		List<ConversationMessage> windowedMessages = switch (conversationId) {
 			case "conv-zhang-san" -> List.of(
 					new ConversationMessage(
 							"msg-zhang-1",
 							conversationId,
 							"Zhang San",
-							"Remote conversation messages are now flowing from argus-cortex.",
+							"Remote message sync currently serves a recent " + normalizedWindowDays + "-day window.",
 							"09:24",
 							false,
 							"DELIVERED"
@@ -70,7 +76,7 @@ public class ConversationApplicationService {
 							"msg-zhang-2",
 							conversationId,
 							accountRecord.displayName(),
-							"This reply comes from the authenticated Android account.",
+							"This reply comes from the authenticated Android account inside the remote recent window.",
 							"09:28",
 							true,
 							"DELIVERED"
@@ -81,7 +87,7 @@ public class ConversationApplicationService {
 							"msg-group-1",
 							conversationId,
 							"Project Group",
-							"Next step: replace these seeded messages with real sync storage.",
+							"Next step: replace seeded windowed messages with real sync storage.",
 							"Yesterday",
 							false,
 							"DELIVERED"
@@ -92,13 +98,15 @@ public class ConversationApplicationService {
 							"msg-generic-1",
 							conversationId,
 							accountRecord.displayName(),
-							"Remote conversation placeholder for " + conversationId + ".",
+							"Remote recent-window placeholder for " + conversationId + ".",
 							"Now",
 							true,
 							"SENT"
 					)
 			);
 		};
+
+		return windowedMessages.stream().limit(normalizedLimit).toList();
 	}
 
 	public ConversationMessage sendMessage(
@@ -118,5 +126,13 @@ public class ConversationApplicationService {
 				true,
 				"DELIVERED"
 		);
+	}
+
+	private int normalizeRecentWindowDays(int requestedWindowDays) {
+		return requestedWindowDays <= 0 ? DEFAULT_RECENT_WINDOW_DAYS : Math.min(requestedWindowDays, 30);
+	}
+
+	private int normalizeMessageLimit(int requestedLimit) {
+		return requestedLimit <= 0 ? DEFAULT_MESSAGE_LIMIT : Math.min(requestedLimit, 200);
 	}
 }

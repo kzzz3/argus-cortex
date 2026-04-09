@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,9 +24,13 @@ public class ConversationController {
 
 	@GetMapping
 	public List<ConversationSummaryResponse> listConversations(
+			@RequestParam(name = "recentWindowDays", defaultValue = "7") int recentWindowDays,
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
-		return conversationApplicationService.listConversations(extractBearerToken(authorizationHeader))
+		return conversationApplicationService.listConversations(
+				extractBearerToken(authorizationHeader),
+				recentWindowDays
+		)
 				.stream()
 				.map(ConversationSummaryResponse::from)
 				.toList();
@@ -34,11 +39,15 @@ public class ConversationController {
 	@GetMapping("/{conversationId}/messages")
 	public List<ConversationMessageResponse> listMessages(
 			@PathVariable String conversationId,
+			@RequestParam(name = "recentWindowDays", defaultValue = "7") int recentWindowDays,
+			@RequestParam(name = "limit", defaultValue = "50") int limit,
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
 		return conversationApplicationService.listMessages(
 				extractBearerToken(authorizationHeader),
-				conversationId
+				conversationId,
+				recentWindowDays,
+				limit
 		)
 				.stream()
 				.map(ConversationMessageResponse::from)
