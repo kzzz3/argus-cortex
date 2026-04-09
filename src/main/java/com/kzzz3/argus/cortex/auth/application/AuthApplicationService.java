@@ -1,6 +1,6 @@
 package com.kzzz3.argus.cortex.auth.application;
 
-import com.kzzz3.argus.cortex.auth.domain.AccessTokenIssuer;
+import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
@@ -13,11 +13,11 @@ import org.springframework.stereotype.Service;
 public class AuthApplicationService {
 
 	private final AccountStore accountStore;
-	private final AccessTokenIssuer accessTokenIssuer;
+	private final AccessTokenStore accessTokenStore;
 
-	public AuthApplicationService(AccountStore accountStore, AccessTokenIssuer accessTokenIssuer) {
+	public AuthApplicationService(AccountStore accountStore, AccessTokenStore accessTokenStore) {
 		this.accountStore = accountStore;
-		this.accessTokenIssuer = accessTokenIssuer;
+		this.accessTokenStore = accessTokenStore;
 	}
 
 	public AuthResult register(RegisterRequest request) {
@@ -37,7 +37,7 @@ public class AuthApplicationService {
 		return new AuthResult(
 				registeredAccount.accountId(),
 				registeredAccount.displayName(),
-				accessTokenIssuer.issue(),
+				accessTokenStore.issue(registeredAccount),
 				"Registration succeeded. Stage-1 server session issued."
 		);
 	}
@@ -54,8 +54,20 @@ public class AuthApplicationService {
 		return new AuthResult(
 				accountRecord.accountId(),
 				accountRecord.displayName(),
-				accessTokenIssuer.issue(),
+				accessTokenStore.issue(accountRecord),
 				"Login succeeded. Stage-1 server session issued."
+		);
+	}
+
+	public AuthResult restoreSession(String accessToken) {
+		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+
+		return new AuthResult(
+				accountRecord.accountId(),
+				accountRecord.displayName(),
+				accessToken,
+				"Session restored from server token."
 		);
 	}
 

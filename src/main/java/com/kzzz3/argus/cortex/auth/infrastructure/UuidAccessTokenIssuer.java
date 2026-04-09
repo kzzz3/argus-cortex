@@ -1,14 +1,27 @@
 package com.kzzz3.argus.cortex.auth.infrastructure;
 
-import com.kzzz3.argus.cortex.auth.domain.AccessTokenIssuer;
+import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
+import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import java.util.UUID;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
 @Component
-public class UuidAccessTokenIssuer implements AccessTokenIssuer {
+public class UuidAccessTokenIssuer implements AccessTokenStore {
+
+	private final Map<String, AccountRecord> sessionByToken = new ConcurrentHashMap<>();
 
 	@Override
-	public String issue() {
-		return "argus-" + UUID.randomUUID();
+	public String issue(AccountRecord accountRecord) {
+		String accessToken = "argus-" + UUID.randomUUID();
+		sessionByToken.put(accessToken, accountRecord);
+		return accessToken;
+	}
+
+	@Override
+	public Optional<AccountRecord> findByToken(String accessToken) {
+		return Optional.ofNullable(sessionByToken.get(accessToken));
 	}
 }
