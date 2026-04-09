@@ -128,6 +128,25 @@ public class ConversationApplicationService {
 		);
 	}
 
+	public ConversationMessage recallMessage(
+			String accessToken,
+			String conversationId,
+			String messageId
+	) {
+		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+
+		return new ConversationMessage(
+				messageId,
+				conversationId,
+				accountRecord.displayName(),
+				"You recalled a message",
+				"Now",
+				true,
+				"RECALLED"
+		);
+	}
+
 	private int normalizeRecentWindowDays(int requestedWindowDays) {
 		return requestedWindowDays <= 0 ? DEFAULT_RECENT_WINDOW_DAYS : Math.min(requestedWindowDays, 30);
 	}

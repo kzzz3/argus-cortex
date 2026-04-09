@@ -69,6 +69,22 @@ public class ConversationController {
 		);
 	}
 
+	@PostMapping("/{conversationId}/messages/{messageId}/recall")
+	public ConversationMessageResponse recallMessage(
+			@PathVariable String conversationId,
+			@PathVariable String messageId,
+			@RequestHeader("Authorization") String authorizationHeader,
+			@RequestBody(required = false) RecallMessageRequest request
+	) {
+		return ConversationMessageResponse.from(
+				conversationApplicationService.recallMessage(
+						extractBearerToken(authorizationHeader),
+						conversationId,
+						messageId
+				)
+		);
+	}
+
 	private String extractBearerToken(String authorizationHeader) {
 		if (authorizationHeader == null) {
 			throw new IllegalArgumentException("Missing Authorization header.");
