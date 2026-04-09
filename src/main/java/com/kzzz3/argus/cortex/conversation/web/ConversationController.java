@@ -1,9 +1,12 @@
 package com.kzzz3.argus.cortex.conversation.web;
 
 import com.kzzz3.argus.cortex.conversation.application.ConversationApplicationService;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,6 +43,21 @@ public class ConversationController {
 				.stream()
 				.map(ConversationMessageResponse::from)
 				.toList();
+	}
+
+	@PostMapping("/{conversationId}/messages")
+	public ConversationMessageResponse sendMessage(
+			@PathVariable String conversationId,
+			@RequestHeader("Authorization") String authorizationHeader,
+			@Valid @RequestBody SendMessageRequest request
+	) {
+		return ConversationMessageResponse.from(
+				conversationApplicationService.sendMessage(
+						extractBearerToken(authorizationHeader),
+						conversationId,
+						request
+				)
+		);
 	}
 
 	private String extractBearerToken(String authorizationHeader) {
