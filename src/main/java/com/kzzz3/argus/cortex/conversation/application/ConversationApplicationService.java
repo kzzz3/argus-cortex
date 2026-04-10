@@ -9,6 +9,7 @@ import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
+import com.kzzz3.argus.cortex.conversation.web.MessageReceiptRequest;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,17 @@ public class ConversationApplicationService {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
 		return conversationStore.sendMessage(accountRecord, conversationId, request.body().trim());
+	}
+
+	public ConversationMessage applyReceipt(
+			String accessToken,
+			String conversationId,
+			String messageId,
+			MessageReceiptRequest request
+	) {
+		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+		return conversationStore.applyReceipt(accountRecord, conversationId, messageId, request.receiptType().trim());
 	}
 
 	public ConversationMessage recallMessage(

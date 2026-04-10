@@ -17,6 +17,8 @@ public interface ConversationStore {
 
 	ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String body);
 
+	ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType);
+
 	ConversationMessage recallMessage(AccountRecord accountRecord, String conversationId, String messageId);
 
 	ConversationSummary markConversationRead(AccountRecord accountRecord, String conversationId);

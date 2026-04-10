@@ -75,6 +75,23 @@ public class ConversationController {
 		);
 	}
 
+	@PostMapping("/{conversationId}/messages/{messageId}/receipt")
+	public ConversationMessageResponse applyReceipt(
+			@PathVariable String conversationId,
+			@PathVariable String messageId,
+			@RequestHeader("Authorization") String authorizationHeader,
+			@Valid @RequestBody MessageReceiptRequest request
+	) {
+		return ConversationMessageResponse.from(
+				conversationApplicationService.applyReceipt(
+						extractBearerToken(authorizationHeader),
+						conversationId,
+						messageId,
+						request
+				)
+		);
+	}
+
 	@PostMapping("/{conversationId}/messages/{messageId}/recall")
 	public ConversationMessageResponse recallMessage(
 			@PathVariable String conversationId,

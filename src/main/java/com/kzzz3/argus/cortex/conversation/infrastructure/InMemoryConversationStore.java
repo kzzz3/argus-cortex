@@ -62,6 +62,12 @@ public class InMemoryConversationStore implements ConversationStore {
 	}
 
 	@Override
+	public ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType) {
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		return threadState.applyReceipt(messageId, receiptType);
+	}
+
+	@Override
 	public ConversationMessage recallMessage(AccountRecord accountRecord, String conversationId, String messageId) {
 		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
 		return threadState.recallMessage(accountRecord.displayName(), messageId);
@@ -219,6 +225,34 @@ public class InMemoryConversationStore implements ConversationStore {
 					messages.set(index, recalled);
 					version += 1;
 					return recalled;
+				}
+			}
+			throw new MessageNotFoundException(messageId);
+		}
+
+		private ConversationMessage applyReceipt(String messageId, String receiptType) {
+			for (int index = 0; index < messages.size(); index += 1) {
+				ConversationMessage message = messages.get(index);
+				if (message.id().equals(messageId)) {
+					String normalizedReceiptType = receiptType == null ? "DELIVERED" : receiptType.toUpperCase();
+					String nextStatus = switch (normalizedReceiptType) {
+						case "READ" -> "DELIVERED";
+						case "DELIVERED" -> "DELIVERED";
+						default -> "DELIVERED";
+					};
+					ConversationMessage updated = new ConversationMessage(
+							message.id(),
+							message.conversationId(),
+							message.senderDisplayName(),
+							message.body(),
+							message.timestampLabel(),
+							message.fromCurrentUser(),
+							nextStatus,
+							"2026-04-10T22:30:00+08:00"
+					);
+					messages.set(index, updated);
+					version += 1;
+					return updated;
 				}
 			}
 			throw new MessageNotFoundException(messageId);
