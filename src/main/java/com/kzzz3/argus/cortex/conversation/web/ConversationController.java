@@ -85,6 +85,20 @@ public class ConversationController {
 		);
 	}
 
+	@PostMapping("/{conversationId}/read")
+	public ConversationSummaryResponse markConversationRead(
+			@PathVariable String conversationId,
+			@RequestHeader("Authorization") String authorizationHeader,
+			@RequestBody(required = false) MarkConversationReadRequest request
+	) {
+		return ConversationSummaryResponse.from(
+				conversationApplicationService.markConversationRead(
+						extractBearerToken(authorizationHeader),
+						conversationId
+				)
+		);
+	}
+
 	private String extractBearerToken(String authorizationHeader) {
 		if (authorizationHeader == null) {
 			throw new IllegalArgumentException("Missing Authorization header.");

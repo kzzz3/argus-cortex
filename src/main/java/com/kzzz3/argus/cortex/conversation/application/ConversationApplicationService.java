@@ -147,6 +147,41 @@ public class ConversationApplicationService {
 		);
 	}
 
+	public ConversationSummary markConversationRead(
+			String accessToken,
+			String conversationId
+	) {
+		accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+
+		return switch (conversationId) {
+			case "conv-zhang-san" -> new ConversationSummary(
+					"conv-zhang-san",
+					"Zhang San",
+					"1:1 direct chat",
+					"Remote inbox keeps only the latest 7 days in server scope.",
+					"09:24",
+					0
+			);
+			case "conv-project-group" -> new ConversationSummary(
+					"conv-project-group",
+					"Project Group",
+					"3 members",
+					"Conversation has been marked read on the server side.",
+					"Yesterday",
+					0
+			);
+			default -> new ConversationSummary(
+					conversationId,
+					conversationId,
+					"Remote conversation",
+					"Conversation has been marked read.",
+					"Now",
+					0
+			);
+		};
+	}
+
 	private int normalizeRecentWindowDays(int requestedWindowDays) {
 		return requestedWindowDays <= 0 ? DEFAULT_RECENT_WINDOW_DAYS : Math.min(requestedWindowDays, 30);
 	}
