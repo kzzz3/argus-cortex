@@ -129,6 +129,8 @@ Primary target: convert first-person audio/video and sensor-confirmed behavior i
 - signed engine result ingestion
 - secure payment token verification support
 
+See also: `docs/retina-cortex-contract.md`
+
 ### 6.3 Internal platform dependencies
 - **MySQL**: account, social graph, conversation metadata, transaction records
 - **Redis**: session routing, rate limits, locks, hot presence state
