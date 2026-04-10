@@ -44,25 +44,19 @@ public class ConversationController {
 			@RequestParam(name = "sinceCursor", required = false) String sinceCursor,
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
-		var messages = conversationApplicationService.listMessages(
+		var page = conversationApplicationService.listMessages(
 				extractBearerToken(authorizationHeader),
 				conversationId,
 				recentWindowDays,
-				limit
-		)
-				.stream()
-				.map(ConversationMessageResponse::from)
-				.toList();
-
-		String nextSyncCursor = messages.isEmpty()
-				? (sinceCursor == null ? "cursor-empty" : sinceCursor)
-				: messages.getLast().id();
+				limit,
+				sinceCursor
+		);
 
 		return new ConversationMessagePageResponse(
-				messages,
-				nextSyncCursor,
-				recentWindowDays,
-				limit
+				page.messages().stream().map(ConversationMessageResponse::from).toList(),
+				page.nextSyncCursor(),
+				page.recentWindowDays(),
+				page.limit()
 		);
 	}
 
