@@ -37,13 +37,14 @@ public class ConversationController {
 	}
 
 	@GetMapping("/{conversationId}/messages")
-	public List<ConversationMessageResponse> listMessages(
+	public ConversationMessagePageResponse listMessages(
 			@PathVariable String conversationId,
 			@RequestParam(name = "recentWindowDays", defaultValue = "7") int recentWindowDays,
 			@RequestParam(name = "limit", defaultValue = "50") int limit,
+			@RequestParam(name = "sinceCursor", required = false) String sinceCursor,
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
-		return conversationApplicationService.listMessages(
+		var messages = conversationApplicationService.listMessages(
 				extractBearerToken(authorizationHeader),
 				conversationId,
 				recentWindowDays,
@@ -52,6 +53,17 @@ public class ConversationController {
 				.stream()
 				.map(ConversationMessageResponse::from)
 				.toList();
+
+		String nextSyncCursor = messages.isEmpty()
+				? (sinceCursor == null ? "cursor-empty" : sinceCursor)
+				: messages.getLast().id();
+
+		return new ConversationMessagePageResponse(
+				messages,
+				nextSyncCursor,
+				recentWindowDays,
+				limit
+		);
 	}
 
 	@PostMapping("/{conversationId}/messages")

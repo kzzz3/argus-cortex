@@ -6,6 +6,7 @@ public record ConversationSummary(
 		String subtitle,
 		String preview,
 		String timestampLabel,
-		int unreadCount
+		int unreadCount,
+		String syncCursor
 ) {
 }

@@ -9,7 +9,8 @@ public record ConversationMessageResponse(
 		String body,
 		String timestampLabel,
 		boolean fromCurrentUser,
-		String deliveryStatus
+		String deliveryStatus,
+		String statusUpdatedAt
 ) {
 	public static ConversationMessageResponse from(ConversationMessage message) {
 		return new ConversationMessageResponse(
@@ -19,7 +20,8 @@ public record ConversationMessageResponse(
 				message.body(),
 				message.timestampLabel(),
 				message.fromCurrentUser(),
-				message.deliveryStatus()
+				message.deliveryStatus(),
+				message.statusUpdatedAt()
 		);
 	}
 }

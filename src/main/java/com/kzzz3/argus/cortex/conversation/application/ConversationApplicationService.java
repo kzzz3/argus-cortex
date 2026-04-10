@@ -36,7 +36,8 @@ public class ConversationApplicationService {
 						"1:1 direct chat",
 						"Remote inbox keeps only the latest " + normalizedWindowDays + " days in server scope.",
 						"09:24",
-						2
+						2,
+						"cursor-zhang-san-24"
 				),
 				new ConversationSummary(
 						"conv-project-group",
@@ -44,7 +45,8 @@ public class ConversationApplicationService {
 						"3 members",
 						accountRecord.displayName() + " is now reading a remote conversation list.",
 						"Yesterday",
-						0
+						0,
+						"cursor-project-group-12"
 				),
 				new ConversationSummary(
 						"conv-li-si",
@@ -52,7 +54,8 @@ public class ConversationApplicationService {
 						"Feature review",
 						"Next step: wire message diff sync on top of this remote thread list.",
 						"Mon",
-						1
+						1,
+						"cursor-li-si-07"
 				)
 		);
 	}
@@ -73,7 +76,8 @@ public class ConversationApplicationService {
 							"Remote message sync currently serves a recent " + normalizedWindowDays + "-day window.",
 							"09:24",
 							false,
-							"DELIVERED"
+							"DELIVERED",
+							"2026-04-10T09:24:00+08:00"
 					),
 					new ConversationMessage(
 							"msg-zhang-2",
@@ -82,7 +86,8 @@ public class ConversationApplicationService {
 							"This reply comes from the authenticated Android account inside the remote recent window.",
 							"09:28",
 							true,
-							"DELIVERED"
+							"DELIVERED",
+							"2026-04-10T09:28:00+08:00"
 					)
 			);
 			case "conv-project-group" -> List.of(
@@ -93,7 +98,8 @@ public class ConversationApplicationService {
 							"Next step: replace seeded windowed messages with real sync storage.",
 							"Yesterday",
 							false,
-							"DELIVERED"
+							"DELIVERED",
+							"2026-04-09T20:00:00+08:00"
 					)
 			);
 			default -> throw new ConversationNotFoundException(conversationId);
@@ -118,7 +124,8 @@ public class ConversationApplicationService {
 				request.body().trim(),
 				"Now",
 				true,
-				"DELIVERED"
+				"DELIVERED",
+				"2026-04-10T21:10:00+08:00"
 		);
 	}
 
@@ -141,7 +148,8 @@ public class ConversationApplicationService {
 				"You recalled a message",
 				"Now",
 				true,
-				"RECALLED"
+				"RECALLED",
+				"2026-04-10T21:11:00+08:00"
 		);
 	}
 
@@ -160,7 +168,8 @@ public class ConversationApplicationService {
 					"1:1 direct chat",
 					"Remote inbox keeps only the latest 7 days in server scope.",
 					"09:24",
-					0
+					0,
+					"cursor-zhang-san-25"
 			);
 			case "conv-project-group" -> new ConversationSummary(
 					"conv-project-group",
@@ -168,7 +177,8 @@ public class ConversationApplicationService {
 					"3 members",
 					"Conversation has been marked read on the server side.",
 					"Yesterday",
-					0
+					0,
+					"cursor-project-group-13"
 			);
 			default -> throw new ConversationNotFoundException(conversationId);
 		};

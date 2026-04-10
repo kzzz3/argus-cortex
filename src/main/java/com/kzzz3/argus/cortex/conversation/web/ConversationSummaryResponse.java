@@ -8,7 +8,8 @@ public record ConversationSummaryResponse(
 		String subtitle,
 		String preview,
 		String timestampLabel,
-		int unreadCount
+		int unreadCount,
+		String syncCursor
 ) {
 	public static ConversationSummaryResponse from(ConversationSummary summary) {
 		return new ConversationSummaryResponse(
@@ -17,7 +18,8 @@ public record ConversationSummaryResponse(
 				summary.subtitle(),
 				summary.preview(),
 				summary.timestampLabel(),
-				summary.unreadCount()
+				summary.unreadCount(),
+				summary.syncCursor()
 		);
 	}
 }

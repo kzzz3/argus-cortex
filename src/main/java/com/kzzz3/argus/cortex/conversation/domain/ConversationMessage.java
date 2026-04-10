@@ -7,6 +7,7 @@ public record ConversationMessage(
 		String body,
 		String timestampLabel,
 		boolean fromCurrentUser,
-		String deliveryStatus
+		String deliveryStatus,
+		String statusUpdatedAt
 ) {
 }
