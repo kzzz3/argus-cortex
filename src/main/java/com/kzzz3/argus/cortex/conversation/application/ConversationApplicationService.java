@@ -4,7 +4,9 @@ import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
+import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +60,7 @@ public class ConversationApplicationService {
 	public List<ConversationMessage> listMessages(String accessToken, String conversationId, int recentWindowDays, int limit) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		requireKnownConversation(conversationId);
 		int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
 		int normalizedLimit = normalizeMessageLimit(limit);
 
@@ -93,17 +96,7 @@ public class ConversationApplicationService {
 							"DELIVERED"
 					)
 			);
-			default -> List.of(
-					new ConversationMessage(
-							"msg-generic-1",
-							conversationId,
-							accountRecord.displayName(),
-							"Remote recent-window placeholder for " + conversationId + ".",
-							"Now",
-							true,
-							"SENT"
-					)
-			);
+			default -> throw new ConversationNotFoundException(conversationId);
 		};
 
 		return windowedMessages.stream().limit(normalizedLimit).toList();
@@ -116,6 +109,7 @@ public class ConversationApplicationService {
 	) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		requireKnownConversation(conversationId);
 
 		return new ConversationMessage(
 				"msg-" + UUID.randomUUID(),
@@ -135,6 +129,10 @@ public class ConversationApplicationService {
 	) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		requireKnownConversation(conversationId);
+		if (messageId.isBlank()) {
+			throw new MessageNotFoundException(messageId);
+		}
 
 		return new ConversationMessage(
 				messageId,
@@ -153,6 +151,7 @@ public class ConversationApplicationService {
 	) {
 		accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
+		requireKnownConversation(conversationId);
 
 		return switch (conversationId) {
 			case "conv-zhang-san" -> new ConversationSummary(
@@ -171,15 +170,14 @@ public class ConversationApplicationService {
 					"Yesterday",
 					0
 			);
-			default -> new ConversationSummary(
-					conversationId,
-					conversationId,
-					"Remote conversation",
-					"Conversation has been marked read.",
-					"Now",
-					0
-			);
+			default -> throw new ConversationNotFoundException(conversationId);
 		};
+	}
+
+	private void requireKnownConversation(String conversationId) {
+		if (!List.of("conv-zhang-san", "conv-project-group", "conv-li-si").contains(conversationId)) {
+			throw new ConversationNotFoundException(conversationId);
+		}
 	}
 
 	private int normalizeRecentWindowDays(int requestedWindowDays) {

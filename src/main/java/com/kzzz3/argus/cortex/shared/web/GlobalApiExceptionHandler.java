@@ -2,6 +2,8 @@ package com.kzzz3.argus.cortex.shared.web;
 
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
+import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +38,17 @@ public class GlobalApiExceptionHandler {
 		}
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 				.body(new ApiErrorResponse("VALIDATION_ERROR", message));
+	}
+
+	@ExceptionHandler(ConversationNotFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handleConversationNotFound(ConversationNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorResponse("CONVERSATION_NOT_FOUND", exception.getMessage()));
+	}
+
+	@ExceptionHandler(MessageNotFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handleMessageNotFound(MessageNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorResponse("MESSAGE_NOT_FOUND", exception.getMessage()));
 	}
 }
