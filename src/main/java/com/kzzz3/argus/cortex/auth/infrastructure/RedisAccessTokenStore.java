@@ -1,10 +1,9 @@
 package com.kzzz3.argus.cortex.auth.infrastructure;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,48 +19,42 @@ public class RedisAccessTokenStore implements AccessTokenStore {
 	private static final Duration SESSION_TTL = Duration.ofDays(7);
 
 	private final StringRedisTemplate redisTemplate;
-	private final ObjectMapper objectMapper;
 
-	public RedisAccessTokenStore(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+	public RedisAccessTokenStore(StringRedisTemplate redisTemplate) {
 		this.redisTemplate = redisTemplate;
-		this.objectMapper = objectMapper;
 	}
 
 	@Override
 	public String issue(AccountRecord accountRecord) {
 		String accessToken = "argus-" + UUID.randomUUID();
-		redisTemplate.opsForValue().set(redisKey(accessToken), serialize(accountRecord), SESSION_TTL);
+		String redisKey = redisKey(accessToken);
+		redisTemplate.opsForHash().put(redisKey, "accountId", accountRecord.accountId());
+		redisTemplate.opsForHash().put(redisKey, "displayName", accountRecord.displayName());
+		redisTemplate.opsForHash().put(redisKey, "password", accountRecord.password());
+		redisTemplate.expire(redisKey, SESSION_TTL);
 		return accessToken;
 	}
 
 	@Override
 	public Optional<AccountRecord> findByToken(String accessToken) {
-		String payload = redisTemplate.opsForValue().get(redisKey(accessToken));
-		if (payload == null || payload.isBlank()) {
+		String redisKey = redisKey(accessToken);
+		Object accountId = redisTemplate.opsForHash().get(redisKey, "accountId");
+		if (accountId == null) {
 			return Optional.empty();
 		}
-		return Optional.ofNullable(deserialize(payload));
+
+		Object displayName = redisTemplate.opsForHash().get(redisKey, "displayName");
+		Object password = redisTemplate.opsForHash().get(redisKey, "password");
+		return Optional.of(
+				new AccountRecord(
+						String.valueOf(accountId),
+						String.valueOf(displayName),
+						String.valueOf(password)
+				)
+		);
 	}
 
 	private String redisKey(String accessToken) {
 		return "argus:session:" + accessToken;
-	}
-
-	private String serialize(AccountRecord accountRecord) {
-		try {
-			return objectMapper.writeValueAsString(accountRecord);
-		}
-		catch (JsonProcessingException exception) {
-			throw new IllegalStateException("Failed to serialize account session.", exception);
-		}
-	}
-
-	private AccountRecord deserialize(String payload) {
-		try {
-			return objectMapper.readValue(payload, AccountRecord.class);
-		}
-		catch (JsonProcessingException exception) {
-			throw new IllegalStateException("Failed to deserialize account session.", exception);
-		}
 	}
 }

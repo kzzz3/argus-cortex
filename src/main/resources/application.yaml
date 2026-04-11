@@ -2,9 +2,9 @@ spring:
   application:
     name: argus-cortex
   datasource:
-    url: ${ARGUS_MYSQL_URL:jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
-    username: ${ARGUS_MYSQL_USERNAME:argus}
-    password: ${ARGUS_MYSQL_PASSWORD:argus_change_me}
+    url: ${ARGUS_MYSQL_URL:jdbc:mysql://localhost:3306/argus?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${ARGUS_MYSQL_USERNAME:argus_cortex}
+    password: ${ARGUS_MYSQL_PASSWORD:argus_cortex}
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
