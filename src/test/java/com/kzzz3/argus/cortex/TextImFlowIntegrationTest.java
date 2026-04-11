@@ -125,6 +125,26 @@ class TextImFlowIntegrationTest {
 						.content("{}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.unreadCount").value(0));
+
+		MvcResult groupCreateResult = mockMvc.perform(post("/api/v1/conversations")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"type":"GROUP","title":"Backend Group"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.title").value("Backend Group"))
+				.andExpect(jsonPath("$.subtitle").value("Remote group conversation"))
+				.andReturn();
+
+		String groupConversationId = objectMapper.readTree(groupCreateResult.getResponse().getContentAsString()).get("id").asText();
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}", groupConversationId)
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.title").value("Backend Group"))
+				.andExpect(jsonPath("$.memberCount").value(3))
+				.andExpect(jsonPath("$.memberDisplayNames", hasSize(3)));
 	}
 
 	private void register(String displayName, String accountId, String password) throws Exception {
