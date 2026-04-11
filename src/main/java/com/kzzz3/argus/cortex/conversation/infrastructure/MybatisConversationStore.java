@@ -61,10 +61,6 @@ public class MybatisConversationStore implements ConversationStore {
 	}
 
 	@Override
-	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String body) {
-		return sendMessage(accountRecord, conversationId, null, body);
-	}
-
 	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body) {
 		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
 		if (clientMessageId != null && !clientMessageId.isBlank()) {

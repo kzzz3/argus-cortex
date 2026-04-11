@@ -47,10 +47,16 @@ public class InMemoryConversationStore implements ConversationStore {
 	}
 
 	@Override
-	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String body) {
+	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body) {
 		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		if (clientMessageId != null && !clientMessageId.isBlank()) {
+			ConversationMessage existing = threadState.findByClientMessageId(clientMessageId);
+			if (existing != null) {
+				return existing;
+			}
+		}
 		ConversationMessage sentMessage = new ConversationMessage(
-				"msg-" + UUID.randomUUID(),
+				clientMessageId == null || clientMessageId.isBlank() ? "msg-" + UUID.randomUUID() : clientMessageId,
 				conversationId,
 				accountRecord.displayName(),
 				body.trim(),
@@ -291,6 +297,13 @@ public class InMemoryConversationStore implements ConversationStore {
 		private List<ConversationMessage> recentMessages(int limit) {
 			int fromIndex = Math.max(messages.size() - limit, 0);
 			return messages.subList(fromIndex, messages.size());
+		}
+
+		private ConversationMessage findByClientMessageId(String clientMessageId) {
+			return messages.stream()
+					.filter(message -> message.id().equals(clientMessageId))
+					.findFirst()
+					.orElse(null);
 		}
 	}
 }

@@ -56,10 +56,12 @@ public class ConversationApplicationService {
 	) {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
-		if (conversationStore instanceof com.kzzz3.argus.cortex.conversation.infrastructure.MybatisConversationStore mybatisConversationStore) {
-			return mybatisConversationStore.sendMessage(accountRecord, conversationId, request.clientMessageId().trim(), request.body().trim());
-		}
-		return conversationStore.sendMessage(accountRecord, conversationId, request.body().trim());
+		return conversationStore.sendMessage(
+				accountRecord,
+				conversationId,
+				request.clientMessageId().trim(),
+				request.body().trim()
+		);
 	}
 
 	public ConversationMessage applyReceipt(

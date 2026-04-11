@@ -15,7 +15,7 @@ public interface ConversationStore {
 			String sinceCursor
 	);
 
-	ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String body);
+	ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body);
 
 	ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType);
 
