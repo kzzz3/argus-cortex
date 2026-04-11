@@ -82,6 +82,28 @@ public class InMemoryConversationStore implements ConversationStore {
 		return threadState.toSummary();
 	}
 
+	@Override
+	public ConversationSummary ensureDirectConversation(AccountRecord owner, AccountRecord friend) {
+		String conversationId = directConversationId(owner.accountId(), friend.accountId());
+		ConversationThreadState ownerThread = getOrSeedConversations(owner, 7)
+				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
+						conversationId,
+						friend.displayName(),
+						"Direct friend conversation",
+						0,
+						new ArrayList<>()
+				));
+		getOrSeedConversations(friend, 7)
+				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
+						conversationId,
+						owner.displayName(),
+						"Direct friend conversation",
+						0,
+						new ArrayList<>()
+				));
+		return ownerThread.toSummary();
+	}
+
 	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId, int recentWindowDays) {
 		ConversationThreadState threadState = getOrSeedConversations(accountRecord, recentWindowDays).get(conversationId);
 		if (threadState == null) {
@@ -92,6 +114,12 @@ public class InMemoryConversationStore implements ConversationStore {
 
 	private LinkedHashMap<String, ConversationThreadState> getOrSeedConversations(AccountRecord accountRecord, int recentWindowDays) {
 		return conversationsByAccount.computeIfAbsent(accountRecord.accountId(), ignored -> seedConversations(accountRecord, recentWindowDays));
+	}
+
+	private String directConversationId(String accountIdA, String accountIdB) {
+		return accountIdA.compareTo(accountIdB) < 0
+				? "conv-direct-" + accountIdA + "-" + accountIdB
+				: "conv-direct-" + accountIdB + "-" + accountIdA;
 	}
 
 	private LinkedHashMap<String, ConversationThreadState> seedConversations(AccountRecord accountRecord, int recentWindowDays) {

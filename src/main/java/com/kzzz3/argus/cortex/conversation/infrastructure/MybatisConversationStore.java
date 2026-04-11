@@ -117,6 +117,14 @@ public class MybatisConversationStore implements ConversationStore {
 		return toSummary(thread);
 	}
 
+	@Override
+	public ConversationSummary ensureDirectConversation(AccountRecord owner, AccountRecord friend) {
+		String conversationId = directConversationId(owner.accountId(), friend.accountId());
+		ConversationThreadEntity ownerThread = ensureDirectConversationThread(owner.accountId(), friend.displayName(), conversationId);
+		ensureDirectConversationThread(friend.accountId(), owner.displayName(), conversationId);
+		return toSummary(ownerThread);
+	}
+
 	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
 		seedConversations(new AccountRecord(ownerAccountId, ownerAccountId, ""), recentWindowDays);
 		ConversationThreadEntity entity = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
@@ -160,6 +168,19 @@ public class MybatisConversationStore implements ConversationStore {
 		entity.setSyncCursor(nextCursor(conversationId, 0));
 		entity.setUpdatedAt(LocalDateTime.now());
 		threadMapper.insert(entity);
+	}
+
+	private ConversationThreadEntity ensureDirectConversationThread(String ownerAccountId, String title, String conversationId) {
+		ConversationThreadEntity existing = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		if (existing != null) {
+			return existing;
+		}
+		insertThread(ownerAccountId, conversationId, title, "Direct friend conversation", 0);
+		return threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
 	}
 
 	private void insertMessage(String ownerAccountId, String conversationId, long sequenceNo, String senderAccountId, String senderDisplayName, String body, boolean fromCurrentUser, String deliveryStatus, String statusUpdatedAt, String timestampLabel) {
@@ -234,5 +255,11 @@ public class MybatisConversationStore implements ConversationStore {
 
 	private String nextCursor(String conversationId, long sequenceNo) {
 		return "cursor-" + conversationId + "-" + sequenceNo;
+	}
+
+	private String directConversationId(String accountIdA, String accountIdB) {
+		return accountIdA.compareTo(accountIdB) < 0
+				? "conv-direct-" + accountIdA + "-" + accountIdB
+				: "conv-direct-" + accountIdB + "-" + accountIdA;
 	}
 }
