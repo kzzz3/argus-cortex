@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS conversation_thread (
     CONSTRAINT uk_conversation_thread UNIQUE (owner_account_id, conversation_id)
 );
 
+CREATE TABLE IF NOT EXISTS conversation_member (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    owner_account_id VARCHAR(64) NOT NULL,
+    conversation_id VARCHAR(64) NOT NULL,
+    member_account_id VARCHAR(64) NOT NULL,
+    member_display_name VARCHAR(128) NOT NULL,
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_conversation_member UNIQUE (owner_account_id, conversation_id, member_account_id)
+);
+
 CREATE TABLE IF NOT EXISTS conversation_message (
     id VARCHAR(128) PRIMARY KEY,
     client_message_id VARCHAR(128) NOT NULL,

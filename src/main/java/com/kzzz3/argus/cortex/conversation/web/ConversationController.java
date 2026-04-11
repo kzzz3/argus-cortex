@@ -62,6 +62,21 @@ public class ConversationController {
 		);
 	}
 
+	@PostMapping("/{conversationId}/members")
+	public ConversationDetailResponse addMember(
+			@PathVariable String conversationId,
+			@RequestHeader("Authorization") String authorizationHeader,
+			@Valid @RequestBody AddConversationMemberRequest request
+	) {
+		return ConversationDetailResponse.from(
+				conversationApplicationService.addMember(
+						extractBearerToken(authorizationHeader),
+						conversationId,
+						request
+				)
+		);
+	}
+
 	@GetMapping("/{conversationId}/messages")
 	public ConversationMessagePageResponse listMessages(
 			@PathVariable String conversationId,

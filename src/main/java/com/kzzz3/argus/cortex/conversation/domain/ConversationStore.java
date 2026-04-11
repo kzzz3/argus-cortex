@@ -28,4 +28,6 @@ public interface ConversationStore {
 	ConversationSummary ensureDirectConversation(AccountRecord owner, AccountRecord friend);
 
 	ConversationSummary createConversation(AccountRecord owner, String type, String title);
+
+	ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member);
 }

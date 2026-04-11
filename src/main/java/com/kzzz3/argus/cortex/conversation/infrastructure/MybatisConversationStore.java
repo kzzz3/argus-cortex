@@ -9,8 +9,10 @@ import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
+import com.kzzz3.argus.cortex.conversation.infrastructure.entity.ConversationMemberEntity;
 import com.kzzz3.argus.cortex.conversation.infrastructure.entity.ConversationMessageEntity;
 import com.kzzz3.argus.cortex.conversation.infrastructure.entity.ConversationThreadEntity;
+import com.kzzz3.argus.cortex.conversation.infrastructure.mapper.ConversationMemberMapper;
 import com.kzzz3.argus.cortex.conversation.infrastructure.mapper.ConversationMessageMapper;
 import com.kzzz3.argus.cortex.conversation.infrastructure.mapper.ConversationThreadMapper;
 import java.time.LocalDateTime;
@@ -26,10 +28,12 @@ import org.springframework.stereotype.Component;
 public class MybatisConversationStore implements ConversationStore {
 
 	private final ConversationThreadMapper threadMapper;
+	private final ConversationMemberMapper memberMapper;
 	private final ConversationMessageMapper messageMapper;
 
-	public MybatisConversationStore(ConversationThreadMapper threadMapper, ConversationMessageMapper messageMapper) {
+	public MybatisConversationStore(ConversationThreadMapper threadMapper, ConversationMemberMapper memberMapper, ConversationMessageMapper messageMapper) {
 		this.threadMapper = threadMapper;
+		this.memberMapper = memberMapper;
 		this.messageMapper = messageMapper;
 	}
 
@@ -47,9 +51,16 @@ public class MybatisConversationStore implements ConversationStore {
 	@Override
 	public ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId) {
 		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
-		List<String> members = conversationId.startsWith("conv-group-")
-				? List.of(accountRecord.displayName(), "Zhang San", "Li Si")
-				: List.of(accountRecord.displayName(), thread.getTitle());
+		List<String> members = memberMapper.selectList(new LambdaQueryWrapper<ConversationMemberEntity>()
+				.eq(ConversationMemberEntity::getOwnerAccountId, accountRecord.accountId())
+				.eq(ConversationMemberEntity::getConversationId, conversationId)
+				.orderByAsc(ConversationMemberEntity::getId))
+				.stream()
+				.map(ConversationMemberEntity::getMemberDisplayName)
+				.toList();
+		if (members.isEmpty()) {
+			members = List.of(accountRecord.displayName(), thread.getTitle());
+		}
 		return new ConversationDetail(
 				thread.getConversationId(),
 				thread.getTitle(),
@@ -176,7 +187,29 @@ public class MybatisConversationStore implements ConversationStore {
 		ConversationThreadEntity created = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
 				.eq(ConversationThreadEntity::getOwnerAccountId, owner.accountId())
 				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		insertMember(owner.accountId(), conversationId, owner.accountId(), owner.displayName());
 		return toSummary(created);
+	}
+
+	@Override
+	public ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member) {
+		ConversationThreadEntity ownerThread = requireThread(owner.accountId(), conversationId, 7);
+		ensureMember(owner.accountId(), conversationId, member.accountId(), member.displayName());
+
+		List<ConversationThreadEntity> existingThreads = threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		boolean memberHasThread = existingThreads.stream().anyMatch(thread -> thread.getOwnerAccountId().equals(member.accountId()));
+		if (!memberHasThread) {
+			insertThread(member.accountId(), conversationId, ownerThread.getTitle(), ownerThread.getSubtitle(), 0);
+		}
+
+		existingThreads = threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		for (ConversationThreadEntity thread : existingThreads) {
+			ensureMember(thread.getOwnerAccountId(), conversationId, member.accountId(), member.displayName());
+		}
+		ensureMember(member.accountId(), conversationId, owner.accountId(), owner.displayName());
+		return getConversationDetail(owner, conversationId);
 	}
 
 	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
@@ -222,6 +255,26 @@ public class MybatisConversationStore implements ConversationStore {
 		entity.setSyncCursor(nextCursor(conversationId, 0));
 		entity.setUpdatedAt(LocalDateTime.now());
 		threadMapper.insert(entity);
+	}
+
+	private void insertMember(String ownerAccountId, String conversationId, String memberAccountId, String memberDisplayName) {
+		ConversationMemberEntity entity = new ConversationMemberEntity();
+		entity.setOwnerAccountId(ownerAccountId);
+		entity.setConversationId(conversationId);
+		entity.setMemberAccountId(memberAccountId);
+		entity.setMemberDisplayName(memberDisplayName);
+		entity.setJoinedAt(LocalDateTime.now());
+		memberMapper.insert(entity);
+	}
+
+	private void ensureMember(String ownerAccountId, String conversationId, String memberAccountId, String memberDisplayName) {
+		long count = memberMapper.selectCount(new LambdaQueryWrapper<ConversationMemberEntity>()
+				.eq(ConversationMemberEntity::getOwnerAccountId, ownerAccountId)
+				.eq(ConversationMemberEntity::getConversationId, conversationId)
+				.eq(ConversationMemberEntity::getMemberAccountId, memberAccountId));
+		if (count == 0L) {
+			insertMember(ownerAccountId, conversationId, memberAccountId, memberDisplayName);
+		}
 	}
 
 	private ConversationThreadEntity ensureDirectConversationThread(String ownerAccountId, String title, String conversationId) {

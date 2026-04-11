@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.conversation.application;
 
 import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
+import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
@@ -11,6 +12,7 @@ import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import com.kzzz3.argus.cortex.conversation.web.CreateConversationRequest;
+import com.kzzz3.argus.cortex.conversation.web.AddConversationMemberRequest;
 import com.kzzz3.argus.cortex.conversation.web.MessageReceiptRequest;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
 import java.util.List;
@@ -23,10 +25,12 @@ public class ConversationApplicationService {
 	private static final int DEFAULT_MESSAGE_LIMIT = 50;
 
 	private final AccessTokenStore accessTokenStore;
+	private final AccountStore accountStore;
 	private final ConversationStore conversationStore;
 
-	public ConversationApplicationService(AccessTokenStore accessTokenStore, ConversationStore conversationStore) {
+	public ConversationApplicationService(AccessTokenStore accessTokenStore, AccountStore accountStore, ConversationStore conversationStore) {
 		this.accessTokenStore = accessTokenStore;
+		this.accountStore = accountStore;
 		this.conversationStore = conversationStore;
 	}
 
@@ -109,6 +113,18 @@ public class ConversationApplicationService {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
 		return conversationStore.createConversation(accountRecord, request.type().trim(), request.title().trim());
+	}
+
+	public ConversationDetail addMember(
+			String accessToken,
+			String conversationId,
+			AddConversationMemberRequest request
+	) {
+		AccountRecord owner = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+		AccountRecord member = accountStore.findByAccountId(request.memberAccountId().trim())
+				.orElseThrow(InvalidCredentialsException::new);
+		return conversationStore.addMember(owner, conversationId, member);
 	}
 
 	private int normalizeRecentWindowDays(int requestedWindowDays) {

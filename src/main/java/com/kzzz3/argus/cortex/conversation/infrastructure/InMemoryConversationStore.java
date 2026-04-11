@@ -104,7 +104,8 @@ public class InMemoryConversationStore implements ConversationStore {
 						friend.displayName(),
 						"Direct friend conversation",
 						0,
-						new ArrayList<>()
+						new ArrayList<>(),
+						new ArrayList<>(List.of(owner.displayName(), friend.displayName()))
 				));
 		getOrSeedConversations(friend, 7)
 				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
@@ -112,7 +113,8 @@ public class InMemoryConversationStore implements ConversationStore {
 						owner.displayName(),
 						"Direct friend conversation",
 						0,
-						new ArrayList<>()
+						new ArrayList<>(),
+						new ArrayList<>(List.of(owner.displayName(), friend.displayName()))
 				));
 		return ownerThread.toSummary();
 	}
@@ -132,9 +134,36 @@ public class InMemoryConversationStore implements ConversationStore {
 						normalizedTitle,
 						normalizedType.equals("GROUP") ? "Remote group conversation" : "Remote direct conversation",
 						0,
-						new ArrayList<>()
+						new ArrayList<>(),
+						new ArrayList<>(List.of(owner.displayName()))
 				));
 		return threadState.toSummary();
+	}
+
+	@Override
+	public ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member) {
+		ConversationThreadState ownerThread = requireConversation(owner, conversationId, 7);
+		ownerThread.ensureMember(member.displayName());
+
+		ConversationThreadState memberThread = getOrSeedConversations(member, 7)
+				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
+						conversationId,
+						ownerThread.title,
+						ownerThread.subtitle,
+						0,
+						new ArrayList<>(),
+						new ArrayList<>(ownerThread.members)
+				));
+		memberThread.ensureMember(member.displayName());
+
+		for (Map.Entry<String, LinkedHashMap<String, ConversationThreadState>> entry : conversationsByAccount.entrySet()) {
+			ConversationThreadState threadState = entry.getValue().get(conversationId);
+			if (threadState != null) {
+				threadState.ensureMember(member.displayName());
+			}
+		}
+
+		return ownerThread.toDetail(owner.displayName());
 	}
 
 	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId, int recentWindowDays) {
@@ -184,7 +213,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"DELIVERED",
 								"2026-04-10T09:28:00+08:00"
 						)
-				))
+				)),
+				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San"))
 		));
 
 		threads.put("conv-project-group", new ConversationThreadState(
@@ -203,7 +233,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"DELIVERED",
 								"2026-04-09T20:00:00+08:00"
 						)
-				))
+				)),
+				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San", "Li Si"))
 		));
 
 		threads.put("conv-li-si", new ConversationThreadState(
@@ -222,7 +253,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"SENT",
 								"2026-04-08T10:00:00+08:00"
 						)
-				))
+				)),
+				new ArrayList<>(List.of(accountRecord.displayName(), "Li Si"))
 		));
 
 		return threads;
@@ -233,15 +265,17 @@ public class InMemoryConversationStore implements ConversationStore {
 		private final String title;
 		private final String subtitle;
 		private final List<ConversationMessage> messages;
+		private final List<String> members;
 		private int unreadCount;
 		private long version;
 
-		private ConversationThreadState(String id, String title, String subtitle, int unreadCount, List<ConversationMessage> messages) {
+		private ConversationThreadState(String id, String title, String subtitle, int unreadCount, List<ConversationMessage> messages, List<String> members) {
 			this.id = id;
 			this.title = title;
 			this.subtitle = subtitle;
 			this.unreadCount = unreadCount;
 			this.messages = messages;
+			this.members = members;
 			this.version = messages.size();
 		}
 
@@ -262,10 +296,17 @@ public class InMemoryConversationStore implements ConversationStore {
 		}
 
 		private ConversationDetail toDetail(String ownerDisplayName) {
-			List<String> members = id.startsWith("conv-group-")
-					? List.of(ownerDisplayName, "Zhang San", "Li Si")
-					: List.of(ownerDisplayName, title);
-			return new ConversationDetail(id, title, subtitle, members.size(), members);
+			List<String> memberNames = members.isEmpty()
+					? (id.startsWith("conv-group-") ? List.of(ownerDisplayName, "Zhang San", "Li Si") : List.of(ownerDisplayName, title))
+					: members;
+			return new ConversationDetail(id, title, subtitle, memberNames.size(), memberNames);
+		}
+
+		private void ensureMember(String displayName) {
+			if (!members.contains(displayName)) {
+				members.add(displayName);
+				version += 1;
+			}
 		}
 
 		private void addMessage(ConversationMessage message) {
