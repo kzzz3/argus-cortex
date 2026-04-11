@@ -236,7 +236,7 @@ public class InMemoryConversationStore implements ConversationStore {
 				if (message.id().equals(messageId)) {
 					String normalizedReceiptType = receiptType == null ? "DELIVERED" : receiptType.toUpperCase();
 					String nextStatus = switch (normalizedReceiptType) {
-						case "READ" -> "DELIVERED";
+						case "READ" -> "READ";
 						case "DELIVERED" -> "DELIVERED";
 						default -> "DELIVERED";
 					};
