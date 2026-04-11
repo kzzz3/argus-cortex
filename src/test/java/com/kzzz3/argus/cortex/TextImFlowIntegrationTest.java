@@ -139,6 +139,24 @@ class TextImFlowIntegrationTest {
 
 		String groupConversationId = objectMapper.readTree(groupCreateResult.getResponse().getContentAsString()).get("id").asText();
 
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/members", groupConversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"memberAccountId":"zhangsan"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.memberCount").value(2));
+
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/members", groupConversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"memberAccountId":"lisi"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.memberCount").value(3));
+
 		mockMvc.perform(get("/api/v1/conversations/{conversationId}", groupConversationId)
 						.header("Authorization", bearer(accessToken)))
 				.andExpect(status().isOk())

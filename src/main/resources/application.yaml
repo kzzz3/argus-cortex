@@ -13,6 +13,10 @@ spring:
       timeout: 5s
   flyway:
     enabled: true
+    url: ${ARGUS_MYSQL_URL:jdbc:mysql://localhost:3306/argus?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    user: ${ARGUS_MYSQL_USERNAME:argus_cortex}
+    password: ${ARGUS_MYSQL_PASSWORD:argus_cortex}
+    locations: classpath:db/migration
 
 mybatis-plus:
   configuration:
