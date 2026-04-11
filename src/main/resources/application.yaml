@@ -1,3 +1,23 @@
 spring:
   application:
     name: argus-cortex
+  datasource:
+    url: ${ARGUS_MYSQL_URL:jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${ARGUS_MYSQL_USERNAME:argus}
+    password: ${ARGUS_MYSQL_PASSWORD:argus_change_me}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${ARGUS_REDIS_HOST:localhost}
+      port: ${ARGUS_REDIS_PORT:6379}
+      timeout: 5s
+  flyway:
+    enabled: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+argus:
+  persistence:
+    mode: ${ARGUS_PERSISTENCE_MODE:mysql}

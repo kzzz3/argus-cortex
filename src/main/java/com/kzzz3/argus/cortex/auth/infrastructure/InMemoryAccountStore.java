@@ -6,9 +6,11 @@ import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "argus.persistence.mode", havingValue = "memory")
 public class InMemoryAccountStore implements AccountStore {
 
 	private final ConcurrentMap<String, AccountRecord> accountsById = new ConcurrentHashMap<>();

@@ -13,9 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "argus.persistence.mode", havingValue = "memory")
 public class InMemoryConversationStore implements ConversationStore {
 
 	private final Map<String, LinkedHashMap<String, ConversationThreadState>> conversationsByAccount = new ConcurrentHashMap<>();

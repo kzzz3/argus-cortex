@@ -6,9 +6,11 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "argus.persistence.mode", havingValue = "memory")
 public class UuidAccessTokenIssuer implements AccessTokenStore {
 
 	private final Map<String, AccountRecord> sessionByToken = new ConcurrentHashMap<>();
