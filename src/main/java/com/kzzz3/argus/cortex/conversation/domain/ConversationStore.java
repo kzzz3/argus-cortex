@@ -7,6 +7,8 @@ public interface ConversationStore {
 
 	List<ConversationSummary> listConversations(AccountRecord accountRecord, int recentWindowDays);
 
+	ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId);
+
 	ConversationMessagePage listMessages(
 			AccountRecord accountRecord,
 			String conversationId,

@@ -49,6 +49,19 @@ public class ConversationController {
 		);
 	}
 
+	@GetMapping("/{conversationId}")
+	public ConversationDetailResponse getConversationDetail(
+			@PathVariable String conversationId,
+			@RequestHeader("Authorization") String authorizationHeader
+	) {
+		return ConversationDetailResponse.from(
+				conversationApplicationService.getConversationDetail(
+						extractBearerToken(authorizationHeader),
+						conversationId
+				)
+		);
+	}
+
 	@GetMapping("/{conversationId}/messages")
 	public ConversationMessagePageResponse listMessages(
 			@PathVariable String conversationId,

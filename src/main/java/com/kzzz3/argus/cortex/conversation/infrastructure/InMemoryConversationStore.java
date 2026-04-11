@@ -3,6 +3,7 @@ package com.kzzz3.argus.cortex.conversation.infrastructure;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
@@ -27,6 +28,12 @@ public class InMemoryConversationStore implements ConversationStore {
 		return getOrSeedConversations(accountRecord, recentWindowDays).values().stream()
 				.map(ConversationThreadState::toSummary)
 				.toList();
+	}
+
+	@Override
+	public ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId) {
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		return threadState.toDetail(accountRecord.displayName());
 	}
 
 	@Override
@@ -252,6 +259,13 @@ public class InMemoryConversationStore implements ConversationStore {
 
 		private ConversationSummary toSummary() {
 			return new ConversationSummary(id, title, subtitle, preview(), timestampLabel(), unreadCount, cursor());
+		}
+
+		private ConversationDetail toDetail(String ownerDisplayName) {
+			List<String> members = id.startsWith("conv-group-")
+					? List.of(ownerDisplayName, "Zhang San", "Li Si")
+					: List.of(ownerDisplayName, title);
+			return new ConversationDetail(id, title, subtitle, members.size(), members);
 		}
 
 		private void addMessage(ConversationMessage message) {

@@ -5,6 +5,7 @@ import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
@@ -34,6 +35,12 @@ public class ConversationApplicationService {
 				.orElseThrow(InvalidCredentialsException::new);
 		int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
 		return conversationStore.listConversations(accountRecord, normalizedWindowDays);
+	}
+
+	public ConversationDetail getConversationDetail(String accessToken, String conversationId) {
+		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+		return conversationStore.getConversationDetail(accountRecord, conversationId);
 	}
 
 	public ConversationMessagePage listMessages(

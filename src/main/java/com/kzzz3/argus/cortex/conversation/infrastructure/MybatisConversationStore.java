@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.conversation.infrastructure;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
@@ -41,6 +42,21 @@ public class MybatisConversationStore implements ConversationStore {
 				.stream()
 				.map(this::toSummary)
 				.toList();
+	}
+
+	@Override
+	public ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId) {
+		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
+		List<String> members = conversationId.startsWith("conv-group-")
+				? List.of(accountRecord.displayName(), "Zhang San", "Li Si")
+				: List.of(accountRecord.displayName(), thread.getTitle());
+		return new ConversationDetail(
+				thread.getConversationId(),
+				thread.getTitle(),
+				thread.getSubtitle(),
+				members.size(),
+				members
+		);
 	}
 
 	@Override
