@@ -9,6 +9,7 @@ public class ConversationMessageEntity {
 
 	@TableId
 	private String id;
+	private String clientMessageId;
 	private String ownerAccountId;
 	private String conversationId;
 	private String senderAccountId;
@@ -23,6 +24,8 @@ public class ConversationMessageEntity {
 
 	public String getId() { return id; }
 	public void setId(String id) { this.id = id; }
+	public String getClientMessageId() { return clientMessageId; }
+	public void setClientMessageId(String clientMessageId) { this.clientMessageId = clientMessageId; }
 	public String getOwnerAccountId() { return ownerAccountId; }
 	public void setOwnerAccountId(String ownerAccountId) { this.ownerAccountId = ownerAccountId; }
 	public String getConversationId() { return conversationId; }

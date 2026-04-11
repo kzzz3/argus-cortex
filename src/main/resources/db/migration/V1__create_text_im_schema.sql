@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS conversation_thread (
 
 CREATE TABLE IF NOT EXISTS conversation_message (
     id VARCHAR(128) PRIMARY KEY,
+    client_message_id VARCHAR(128) NOT NULL,
     owner_account_id VARCHAR(64) NOT NULL,
     conversation_id VARCHAR(64) NOT NULL,
     sender_account_id VARCHAR(64) NOT NULL,
@@ -46,5 +47,6 @@ CREATE TABLE IF NOT EXISTS conversation_message (
     status_updated_at VARCHAR(64) NOT NULL,
     sequence_no BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_conversation_message_sequence UNIQUE (owner_account_id, conversation_id, sequence_no)
+    CONSTRAINT uk_conversation_message_sequence UNIQUE (owner_account_id, conversation_id, sequence_no),
+    CONSTRAINT uk_conversation_message_client UNIQUE (owner_account_id, conversation_id, client_message_id)
 );

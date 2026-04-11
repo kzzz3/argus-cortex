@@ -62,10 +62,24 @@ public class MybatisConversationStore implements ConversationStore {
 
 	@Override
 	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String body) {
+		return sendMessage(accountRecord, conversationId, null, body);
+	}
+
+	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body) {
 		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
+		if (clientMessageId != null && !clientMessageId.isBlank()) {
+			ConversationMessageEntity existing = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
+					.eq(ConversationMessageEntity::getOwnerAccountId, accountRecord.accountId())
+					.eq(ConversationMessageEntity::getConversationId, conversationId)
+					.eq(ConversationMessageEntity::getClientMessageId, clientMessageId));
+			if (existing != null) {
+				return toMessage(existing);
+			}
+		}
 		long nextSequence = nextSequence(accountRecord.accountId(), conversationId);
 		ConversationMessageEntity entity = new ConversationMessageEntity();
 		entity.setId("msg-" + UUID.randomUUID());
+		entity.setClientMessageId(clientMessageId == null || clientMessageId.isBlank() ? entity.getId() : clientMessageId);
 		entity.setOwnerAccountId(accountRecord.accountId());
 		entity.setConversationId(conversationId);
 		entity.setSenderAccountId(accountRecord.accountId());
@@ -186,6 +200,7 @@ public class MybatisConversationStore implements ConversationStore {
 	private void insertMessage(String ownerAccountId, String conversationId, long sequenceNo, String senderAccountId, String senderDisplayName, String body, boolean fromCurrentUser, String deliveryStatus, String statusUpdatedAt, String timestampLabel) {
 		ConversationMessageEntity entity = new ConversationMessageEntity();
 		entity.setId("seed-" + conversationId + "-" + sequenceNo);
+		entity.setClientMessageId(entity.getId());
 		entity.setOwnerAccountId(ownerAccountId);
 		entity.setConversationId(conversationId);
 		entity.setSenderAccountId(senderAccountId);
