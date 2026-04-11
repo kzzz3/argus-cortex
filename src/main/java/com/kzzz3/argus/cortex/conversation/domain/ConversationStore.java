@@ -24,4 +24,6 @@ public interface ConversationStore {
 	ConversationSummary markConversationRead(AccountRecord accountRecord, String conversationId);
 
 	ConversationSummary ensureDirectConversation(AccountRecord owner, AccountRecord friend);
+
+	ConversationSummary createConversation(AccountRecord owner, String type, String title);
 }

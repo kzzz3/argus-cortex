@@ -135,6 +135,34 @@ public class MybatisConversationStore implements ConversationStore {
 		return toSummary(ownerThread);
 	}
 
+	@Override
+	public ConversationSummary createConversation(AccountRecord owner, String type, String title) {
+		String normalizedType = type == null ? "GROUP" : type.trim().toUpperCase();
+		String normalizedTitle = title == null || title.isBlank() ? "Untitled Conversation" : title.trim();
+		String conversationId = switch (normalizedType) {
+			case "DIRECT" -> "conv-direct-" + owner.accountId() + "-self";
+			case "GROUP" -> "conv-group-" + UUID.randomUUID();
+			default -> "conv-group-" + UUID.randomUUID();
+		};
+		ConversationThreadEntity existing = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getOwnerAccountId, owner.accountId())
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		if (existing != null) {
+			return toSummary(existing);
+		}
+		insertThread(
+				owner.accountId(),
+				conversationId,
+				normalizedTitle,
+				normalizedType.equals("GROUP") ? "Remote group conversation" : "Remote direct conversation",
+				0
+		);
+		ConversationThreadEntity created = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getOwnerAccountId, owner.accountId())
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		return toSummary(created);
+	}
+
 	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
 		seedConversations(new AccountRecord(ownerAccountId, ownerAccountId, ""), recentWindowDays);
 		ConversationThreadEntity entity = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()

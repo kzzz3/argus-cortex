@@ -110,6 +110,26 @@ public class InMemoryConversationStore implements ConversationStore {
 		return ownerThread.toSummary();
 	}
 
+	@Override
+	public ConversationSummary createConversation(AccountRecord owner, String type, String title) {
+		String normalizedType = type == null ? "GROUP" : type.trim().toUpperCase();
+		String normalizedTitle = title == null || title.isBlank() ? "Untitled Conversation" : title.trim();
+		String conversationId = switch (normalizedType) {
+			case "DIRECT" -> "conv-direct-" + owner.accountId() + "-self";
+			case "GROUP" -> "conv-group-" + UUID.randomUUID();
+			default -> "conv-group-" + UUID.randomUUID();
+		};
+		ConversationThreadState threadState = getOrSeedConversations(owner, 7)
+				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
+						conversationId,
+						normalizedTitle,
+						normalizedType.equals("GROUP") ? "Remote group conversation" : "Remote direct conversation",
+						0,
+						new ArrayList<>()
+				));
+		return threadState.toSummary();
+	}
+
 	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId, int recentWindowDays) {
 		ConversationThreadState threadState = getOrSeedConversations(accountRecord, recentWindowDays).get(conversationId);
 		if (threadState == null) {

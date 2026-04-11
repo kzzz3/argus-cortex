@@ -36,6 +36,19 @@ public class ConversationController {
 				.toList();
 	}
 
+	@PostMapping
+	public ConversationSummaryResponse createConversation(
+			@RequestHeader("Authorization") String authorizationHeader,
+			@Valid @RequestBody CreateConversationRequest request
+	) {
+		return ConversationSummaryResponse.from(
+				conversationApplicationService.createConversation(
+						extractBearerToken(authorizationHeader),
+						request
+				)
+		);
+	}
+
 	@GetMapping("/{conversationId}/messages")
 	public ConversationMessagePageResponse listMessages(
 			@PathVariable String conversationId,

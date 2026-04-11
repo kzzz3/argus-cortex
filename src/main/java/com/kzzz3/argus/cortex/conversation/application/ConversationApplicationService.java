@@ -9,6 +9,7 @@ import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
+import com.kzzz3.argus.cortex.conversation.web.CreateConversationRequest;
 import com.kzzz3.argus.cortex.conversation.web.MessageReceiptRequest;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
 import java.util.List;
@@ -92,6 +93,15 @@ public class ConversationApplicationService {
 		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
 				.orElseThrow(InvalidCredentialsException::new);
 		return conversationStore.markConversationRead(accountRecord, conversationId);
+	}
+
+	public ConversationSummary createConversation(
+			String accessToken,
+			CreateConversationRequest request
+	) {
+		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+				.orElseThrow(InvalidCredentialsException::new);
+		return conversationStore.createConversation(accountRecord, request.type().trim(), request.title().trim());
 	}
 
 	private int normalizeRecentWindowDays(int requestedWindowDays) {
