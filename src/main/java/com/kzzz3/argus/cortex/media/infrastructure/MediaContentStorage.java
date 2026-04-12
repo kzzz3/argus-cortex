@@ -17,15 +17,9 @@ public class MediaContentStorage {
     }
 
     public void store(String objectKey, byte[] content) {
-        if (objectKey == null || objectKey.isBlank()) {
-            throw new IllegalArgumentException("Object key is required for storing media content.");
-        }
+        Path destination = resolvePath(objectKey, "storing");
         if (content == null) {
             throw new IllegalArgumentException("Content bytes are required for storing media content.");
-        }
-        Path destination = rootPath.resolve(objectKey).normalize();
-        if (!destination.startsWith(rootPath)) {
-            throw new IllegalArgumentException("Invalid object key path.");
         }
         try {
             Path parent = destination.getParent();
@@ -36,5 +30,30 @@ public class MediaContentStorage {
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to persist uploaded media content.", ex);
         }
+    }
+
+    public byte[] read(String objectKey) {
+        Path destination = resolvePath(objectKey, "reading");
+        try {
+            return Files.readAllBytes(destination);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to read media content.", ex);
+        }
+    }
+
+    public boolean exists(String objectKey) {
+        Path destination = resolvePath(objectKey, "checking existence of");
+        return Files.exists(destination);
+    }
+
+    private Path resolvePath(String objectKey, String operation) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new IllegalArgumentException("Object key is required for " + operation + " media content.");
+        }
+        Path destination = rootPath.resolve(objectKey).normalize();
+        if (!destination.startsWith(rootPath)) {
+            throw new IllegalArgumentException("Invalid object key path.");
+        }
+        return destination;
     }
 }

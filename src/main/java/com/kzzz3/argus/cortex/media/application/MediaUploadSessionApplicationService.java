@@ -121,6 +121,25 @@ public class MediaUploadSessionApplicationService {
         return mediaAttachmentStore.save(attachmentRecord);
     }
 
+    public MediaAttachmentDownload loadAttachment(String accessToken, String attachmentId) {
+        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+                .orElseThrow(InvalidCredentialsException::new);
+        MediaAttachmentRecord record = mediaAttachmentStore.findByAttachmentId(attachmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Media attachment not found."));
+        if (!accountRecord.accountId().equals(record.accountId())) {
+            throw new IllegalArgumentException("Attachment does not belong to the authenticated account.");
+        }
+        String objectKey = record.objectKey();
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new IllegalStateException("Attachment object key is missing.");
+        }
+        if (!mediaContentStorage.exists(objectKey)) {
+            throw new IllegalStateException("Attachment content is missing.");
+        }
+        byte[] content = mediaContentStorage.read(objectKey);
+        return new MediaAttachmentDownload(record, content);
+    }
+
     private MediaAttachmentRecord buildAttachmentRecord(MediaUploadSession session, FinalizeMediaUploadRequest request) {
         return new MediaAttachmentRecord(
                 UUID.randomUUID().toString(),
@@ -168,5 +187,8 @@ public class MediaUploadSessionApplicationService {
         }
         String normalizedBase = baseUrl.replaceAll("/+$", "");
         return normalizedBase + "/api/v1/media/upload-sessions/" + sessionId + "/content";
+    }
+
+    public static record MediaAttachmentDownload(MediaAttachmentRecord record, byte[] content) {
     }
 }

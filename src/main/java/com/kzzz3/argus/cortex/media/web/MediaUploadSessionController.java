@@ -1,9 +1,18 @@
 package com.kzzz3.argus.cortex.media.web;
 
 import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationService;
+import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationService.MediaAttachmentDownload;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -13,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/media/upload-sessions")
+@RequestMapping("/api/v1/media")
 public class MediaUploadSessionController {
 
     private final MediaUploadSessionApplicationService mediaUploadSessionApplicationService;
@@ -22,7 +31,7 @@ public class MediaUploadSessionController {
         this.mediaUploadSessionApplicationService = mediaUploadSessionApplicationService;
     }
 
-    @PostMapping
+    @PostMapping("/upload-sessions")
     public MediaUploadSessionResponse createUploadSession(
             @RequestHeader("Authorization") String authorizationHeader,
             @Valid @RequestBody CreateMediaUploadSessionRequest request
@@ -33,7 +42,7 @@ public class MediaUploadSessionController {
         ));
     }
 
-    @PostMapping("/{sessionId}/finalize")
+    @PostMapping("/upload-sessions/{sessionId}/finalize")
     public MediaAttachmentResponse finalizeUploadSession(
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String sessionId,
@@ -46,7 +55,7 @@ public class MediaUploadSessionController {
         ));
     }
 
-    @PutMapping("/{sessionId}/content")
+    @PutMapping("/upload-sessions/{sessionId}/content")
     public void uploadContent(
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String sessionId,
@@ -59,6 +68,32 @@ public class MediaUploadSessionController {
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to read upload payload.", ex);
         }
+    }
+
+    @GetMapping("/attachments/{attachmentId}/download")
+    public ResponseEntity<byte[]> downloadAttachment(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String attachmentId
+    ) {
+        String accessToken = extractBearerToken(authorizationHeader);
+        MediaAttachmentDownload download = mediaUploadSessionApplicationService.loadAttachment(accessToken, attachmentId);
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        String candidateContentType = download.record().contentType();
+        if (candidateContentType != null && !candidateContentType.isBlank()) {
+            try {
+                mediaType = MediaType.parseMediaType(candidateContentType);
+            } catch (InvalidMediaTypeException ignored) {
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            }
+        }
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(download.record().fileName(), StandardCharsets.UTF_8)
+                .build();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(mediaType);
+        headers.setContentDisposition(disposition);
+        headers.setContentLength(download.content().length);
+        return new ResponseEntity<>(download.content(), headers, HttpStatus.OK);
     }
 
     private String extractBearerToken(String authorizationHeader) {
