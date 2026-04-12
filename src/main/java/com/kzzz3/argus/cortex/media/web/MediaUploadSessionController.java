@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.media.web;
 
 import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -25,6 +26,19 @@ public class MediaUploadSessionController {
     ) {
         return MediaUploadSessionResponse.from(mediaUploadSessionApplicationService.createUploadSession(
                 extractBearerToken(authorizationHeader),
+                request
+        ));
+    }
+
+    @PostMapping("/{sessionId}/finalize")
+    public MediaAttachmentResponse finalizeUploadSession(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String sessionId,
+            @Valid @RequestBody FinalizeMediaUploadRequest request
+    ) {
+        return MediaAttachmentResponse.from(mediaUploadSessionApplicationService.finalizeUploadSession(
+                extractBearerToken(authorizationHeader),
+                sessionId,
                 request
         ));
     }

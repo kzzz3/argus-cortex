@@ -3,11 +3,15 @@ package com.kzzz3.argus.cortex.media.application;
 import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
+import com.kzzz3.argus.cortex.media.domain.MediaAttachmentRecord;
+import com.kzzz3.argus.cortex.media.domain.MediaAttachmentStore;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentType;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSession;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSessionStore;
 import com.kzzz3.argus.cortex.media.web.CreateMediaUploadSessionRequest;
+import com.kzzz3.argus.cortex.media.web.FinalizeMediaUploadRequest;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -20,13 +24,16 @@ public class MediaUploadSessionApplicationService {
 
     private final AccessTokenStore accessTokenStore;
     private final MediaUploadSessionStore mediaUploadSessionStore;
+    private final MediaAttachmentStore mediaAttachmentStore;
 
     public MediaUploadSessionApplicationService(
             AccessTokenStore accessTokenStore,
-            MediaUploadSessionStore mediaUploadSessionStore
+            MediaUploadSessionStore mediaUploadSessionStore,
+            MediaAttachmentStore mediaAttachmentStore
     ) {
         this.accessTokenStore = accessTokenStore;
         this.mediaUploadSessionStore = mediaUploadSessionStore;
+        this.mediaAttachmentStore = mediaAttachmentStore;
     }
 
     public MediaUploadSession createUploadSession(String accessToken, CreateMediaUploadSessionRequest request) {
@@ -57,6 +64,46 @@ public class MediaUploadSessionApplicationService {
         );
 
         return mediaUploadSessionStore.save(session);
+    }
+
+    public MediaAttachmentRecord finalizeUploadSession(
+            String accessToken,
+            String sessionId,
+            FinalizeMediaUploadRequest request
+    ) {
+        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
+                .orElseThrow(InvalidCredentialsException::new);
+        MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
+        if (!session.accountId().equals(accountRecord.accountId())) {
+            throw new IllegalArgumentException("Upload session does not belong to the authenticated account.");
+        }
+
+        MediaAttachmentRecord attachmentRecord = buildAttachmentRecord(session, request);
+        return mediaAttachmentStore.save(attachmentRecord);
+    }
+
+    private MediaAttachmentRecord buildAttachmentRecord(MediaUploadSession session, FinalizeMediaUploadRequest request) {
+        return new MediaAttachmentRecord(
+                UUID.randomUUID().toString(),
+                session.sessionId(),
+                session.accountId(),
+                normalizeConversationId(request.conversationId()),
+                session.attachmentType(),
+                request.fileName(),
+                request.contentType(),
+                request.contentLength(),
+                request.objectKey(),
+                session.uploadUrl(),
+                LocalDateTime.now()
+        );
+    }
+
+    private String normalizeConversationId(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return null;
+        }
+        return conversationId;
     }
 
     private String generateSessionId(String accountId, String fileName, MediaAttachmentType attachmentType) {
