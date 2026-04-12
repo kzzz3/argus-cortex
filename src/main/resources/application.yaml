@@ -25,6 +25,9 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 argus:
-
   persistence:
     mode: ${ARGUS_PERSISTENCE_MODE:mysql}
+  media:
+    storage:
+      root-dir: ${ARGUS_MEDIA_STORAGE_ROOT:./var/media-storage}
+      public-base-url: ${ARGUS_MEDIA_STORAGE_PUBLIC_BASE_URL:http://localhost:8080}

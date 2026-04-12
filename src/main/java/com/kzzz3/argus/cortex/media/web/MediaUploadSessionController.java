@@ -1,9 +1,12 @@
 package com.kzzz3.argus.cortex.media.web;
 
 import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,6 +44,21 @@ public class MediaUploadSessionController {
                 sessionId,
                 request
         ));
+    }
+
+    @PutMapping("/{sessionId}/content")
+    public void uploadContent(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String sessionId,
+            HttpServletRequest request
+    ) {
+        String accessToken = extractBearerToken(authorizationHeader);
+        try {
+            byte[] content = request.getInputStream().readAllBytes();
+            mediaUploadSessionApplicationService.uploadContent(accessToken, sessionId, content);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to read upload payload.", ex);
+        }
     }
 
     private String extractBearerToken(String authorizationHeader) {

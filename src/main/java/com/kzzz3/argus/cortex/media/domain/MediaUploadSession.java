@@ -6,10 +6,12 @@ public record MediaUploadSession(
         String sessionId,
         String accountId,
         MediaAttachmentType attachmentType,
+        String objectKey,
         String uploadUrl,
         long maxPayloadBytes,
         String uploadToken,
         Map<String, String> uploadHeaders,
-        String instructions
+        String instructions,
+        boolean uploaded
 ) {
 }

@@ -7,4 +7,6 @@ public interface MediaUploadSessionStore {
     MediaUploadSession save(MediaUploadSession session);
 
     Optional<MediaUploadSession> findBySessionId(String sessionId);
+
+    MediaUploadSession markUploaded(String sessionId, String objectKey);
 }

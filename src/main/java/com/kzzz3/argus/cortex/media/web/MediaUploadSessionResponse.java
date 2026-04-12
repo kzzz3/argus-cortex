@@ -7,21 +7,25 @@ import java.util.Map;
 public record MediaUploadSessionResponse(
         String sessionId,
         MediaAttachmentType attachmentType,
+        String objectKey,
         String uploadUrl,
         long maxPayloadBytes,
         String uploadToken,
         Map<String, String> uploadHeaders,
-        String instructions
+        String instructions,
+        boolean uploaded
 ) {
     public static MediaUploadSessionResponse from(MediaUploadSession session) {
         return new MediaUploadSessionResponse(
                 session.sessionId(),
                 session.attachmentType(),
+                session.objectKey(),
                 session.uploadUrl(),
                 session.maxPayloadBytes(),
                 session.uploadToken(),
                 Map.copyOf(session.uploadHeaders()),
-                session.instructions()
+                session.instructions(),
+                session.uploaded()
         );
     }
 }
