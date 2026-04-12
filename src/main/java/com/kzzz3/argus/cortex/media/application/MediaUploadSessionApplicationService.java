@@ -5,6 +5,7 @@ import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentType;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSession;
+import com.kzzz3.argus.cortex.media.domain.MediaUploadSessionStore;
 import com.kzzz3.argus.cortex.media.web.CreateMediaUploadSessionRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -18,9 +19,14 @@ public class MediaUploadSessionApplicationService {
     private static final String UPLOAD_BASE_URL = "https://uploads.argus.dev";
 
     private final AccessTokenStore accessTokenStore;
+    private final MediaUploadSessionStore mediaUploadSessionStore;
 
-    public MediaUploadSessionApplicationService(AccessTokenStore accessTokenStore) {
+    public MediaUploadSessionApplicationService(
+            AccessTokenStore accessTokenStore,
+            MediaUploadSessionStore mediaUploadSessionStore
+    ) {
         this.accessTokenStore = accessTokenStore;
+        this.mediaUploadSessionStore = mediaUploadSessionStore;
     }
 
     public MediaUploadSession createUploadSession(String accessToken, CreateMediaUploadSessionRequest request) {
@@ -39,8 +45,7 @@ public class MediaUploadSessionApplicationService {
                 "X-Upload-Session", sessionId,
                 "X-Attachment-Type", attachmentType.name()
         );
-
-        return new MediaUploadSession(
+        MediaUploadSession session = new MediaUploadSession(
                 sessionId,
                 accountRecord.accountId(),
                 attachmentType,
@@ -50,6 +55,8 @@ public class MediaUploadSessionApplicationService {
                 uploadHeaders,
                 "Upload the requested payload with PUT using the provided headers."
         );
+
+        return mediaUploadSessionStore.save(session);
     }
 
     private String generateSessionId(String accountId, String fileName, MediaAttachmentType attachmentType) {
