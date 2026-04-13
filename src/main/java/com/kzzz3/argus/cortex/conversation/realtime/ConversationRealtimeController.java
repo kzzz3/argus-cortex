@@ -22,11 +22,14 @@ public class ConversationRealtimeController {
     }
 
     @GetMapping("/events")
-    public SseEmitter streamEvents(@RequestHeader("Authorization") String authorizationHeader) {
+    public SseEmitter streamEvents(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId
+    ) {
         AccountRecord accountRecord = accessTokenStore.findByToken(extractBearerToken(authorizationHeader))
                 .orElseThrow(InvalidCredentialsException::new);
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        realtimePublisher.register(accountRecord.accountId(), emitter);
+        realtimePublisher.register(accountRecord.accountId(), emitter, lastEventId);
         emitter.onCompletion(() -> realtimePublisher.unregister(accountRecord.accountId(), emitter));
         emitter.onTimeout(() -> {
             realtimePublisher.unregister(accountRecord.accountId(), emitter);
