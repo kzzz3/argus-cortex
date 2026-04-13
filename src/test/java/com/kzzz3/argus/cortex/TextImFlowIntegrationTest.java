@@ -3,16 +3,19 @@ package com.kzzz3.argus.cortex;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,9 +31,29 @@ class TextImFlowIntegrationTest {
 	@Autowired
 	private WebApplicationContext webApplicationContext;
 
+	@Autowired
+	private DataSource dataSource;
+
 	@BeforeEach
 	void setUp() {
 		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute("""
+				CREATE TABLE IF NOT EXISTS media_attachment (
+				    attachment_id VARCHAR(128) PRIMARY KEY,
+				    session_id VARCHAR(128) NOT NULL,
+				    account_id VARCHAR(64) NOT NULL,
+				    conversation_id VARCHAR(64),
+				    attachment_type VARCHAR(32) NOT NULL,
+				    file_name VARCHAR(255) NOT NULL,
+				    content_type VARCHAR(128) NOT NULL,
+				    content_length BIGINT NOT NULL,
+				    object_key VARCHAR(255) NOT NULL,
+				    upload_url VARCHAR(1024) NOT NULL,
+				    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				    CONSTRAINT uk_media_attachment_session UNIQUE (session_id)
+				)
+				""");
 	}
 
 	@Test
@@ -61,6 +84,8 @@ class TextImFlowIntegrationTest {
 				.andReturn();
 
 		String conversationId = "conv-direct-lisi-tester";
+		JsonNode conversationsBody = objectMapper.readTree(conversationsResult.getResponse().getContentAsString());
+		String initialSyncCursor = findConversationSyncCursor(conversationsBody, conversationId);
 
 		MvcResult sendFirstResult = mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages", conversationId)
 						.header("Authorization", bearer(accessToken))
@@ -85,6 +110,61 @@ class TextImFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(firstMessageId));
 
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"clientMessageId":"client-msg-2","body":"Follow-up 1"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.body").value("Follow-up 1"));
+
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"clientMessageId":"client-msg-3","body":"Follow-up 2"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.body").value("Follow-up 2"));
+
+		MvcResult continuationPageOne = mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "2")
+						.param("sinceCursor", initialSyncCursor))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages", hasSize(2)))
+				.andExpect(jsonPath("$.messages[0].body").value("Hello Zhang San"))
+				.andExpect(jsonPath("$.messages[1].body").value("Follow-up 1"))
+				.andReturn();
+
+		String continuationCursor = objectMapper.readTree(continuationPageOne.getResponse().getContentAsString())
+				.get("nextSyncCursor")
+				.asText();
+
+		MvcResult continuationPageTwo = mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "2")
+						.param("sinceCursor", continuationCursor))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages", hasSize(1)))
+				.andExpect(jsonPath("$.messages[0].body").value("Follow-up 2"))
+				.andReturn();
+
+		String latestContinuationCursor = objectMapper.readTree(continuationPageTwo.getResponse().getContentAsString())
+				.get("nextSyncCursor")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "2")
+						.param("sinceCursor", latestContinuationCursor))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages", hasSize(0)));
+
 		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
 						.header("Authorization", bearer(accessToken))
 						.param("recentWindowDays", "7")
@@ -92,6 +172,80 @@ class TextImFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.messages[*].id").isArray())
 				.andExpect(jsonPath("$.nextSyncCursor").isNotEmpty());
+
+		MvcResult uploadSessionResult = mockMvc.perform(post("/api/v1/media/upload-sessions")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"attachmentType":"IMAGE","fileName":"design-spec.png","estimatedBytes":12}
+								""".formatted(conversationId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionId").isNotEmpty())
+				.andReturn();
+
+		JsonNode uploadSessionBody = objectMapper.readTree(uploadSessionResult.getResponse().getContentAsString());
+		String uploadSessionId = uploadSessionBody.get("sessionId").asText();
+		String uploadObjectKey = uploadSessionBody.get("objectKey").asText();
+
+		mockMvc.perform(put("/api/v1/media/upload-sessions/{sessionId}/content", uploadSessionId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_OCTET_STREAM)
+						.content("hello-image".getBytes()))
+				.andExpect(status().isOk());
+
+		MvcResult finalizeAttachmentResult = mockMvc.perform(post("/api/v1/media/upload-sessions/{sessionId}/finalize", uploadSessionId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"fileName":"design-spec.png","contentType":"image/png","contentLength":11,"objectKey":"%s","conversationId":"%s"}
+								""".formatted(uploadObjectKey, conversationId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.attachmentId").isNotEmpty())
+				.andReturn();
+
+		String attachmentId = objectMapper.readTree(finalizeAttachmentResult.getResponse().getContentAsString()).get("attachmentId").asText();
+
+		MvcResult attachmentMessageResult = mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"clientMessageId":"client-msg-attachment","attachment":{"attachmentId":"%s"}}
+								""".formatted(attachmentId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.attachment.attachmentId").value(attachmentId))
+				.andExpect(jsonPath("$.attachment.fileName").value("design-spec.png"))
+				.andReturn();
+
+		String attachmentMessageId = objectMapper.readTree(attachmentMessageResult.getResponse().getContentAsString()).get("id").asText();
+
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"clientMessageId":"client-msg-attachment","attachment":{"attachmentId":"%s"}}
+								""".formatted(attachmentId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(attachmentMessageId));
+
+		MvcResult attachmentMessagesResult = mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "50"))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		JsonNode attachmentMessagesPage = objectMapper.readTree(attachmentMessagesResult.getResponse().getContentAsString());
+		String attachmentSyncCursor = attachmentMessagesPage.get("nextSyncCursor").asText();
+		JsonNode attachmentMessagesBody = attachmentMessagesPage.get("messages");
+		JsonNode attachmentMessageNode = null;
+		for (JsonNode messageNode : attachmentMessagesBody) {
+			if (attachmentMessageId.equals(messageNode.get("id").asText())) {
+				attachmentMessageNode = messageNode;
+				break;
+			}
+		}
+		org.junit.jupiter.api.Assertions.assertNotNull(attachmentMessageNode);
+		org.junit.jupiter.api.Assertions.assertEquals(attachmentId, attachmentMessageNode.get("attachment").get("attachmentId").asText());
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/receipt", conversationId, firstMessageId)
 						.header("Authorization", bearer(accessToken))
@@ -110,6 +264,15 @@ class TextImFlowIntegrationTest {
 								"""))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.deliveryStatus").value("READ"));
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "50")
+						.param("sinceCursor", attachmentSyncCursor))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages", hasSize(0)))
+				.andExpect(jsonPath("$.nextSyncCursor").value(org.hamcrest.Matchers.startsWith("cursor:conv-direct-lisi-tester:4:")));
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/recall", conversationId, firstMessageId)
 						.header("Authorization", bearer(accessToken))
@@ -184,6 +347,15 @@ class TextImFlowIntegrationTest {
 				.andReturn();
 
 		return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
+	}
+
+	private String findConversationSyncCursor(JsonNode conversationsBody, String conversationId) {
+		for (JsonNode conversation : conversationsBody) {
+			if (conversationId.equals(conversation.get("id").asText())) {
+				return conversation.get("syncCursor").asText();
+			}
+		}
+		throw new IllegalStateException("Conversation not found: " + conversationId);
 	}
 
 	private String bearer(String accessToken) {
