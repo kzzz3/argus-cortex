@@ -216,6 +216,8 @@ The global project is split into eight execution phases, but Cortex only owns th
 - [x] `/api/v1/conversations/{id}/messages` POST exists for remote message send
 - [x] `/api/v1/conversations/{id}/messages/{messageId}/recall` POST exists for remote recall
 - [x] conversation and message list endpoints now expose recent-window semantics instead of pretending to be unbounded full-history truth
+- [x] `/api/v1/conversations/{id}/messages` now supports real cursor continuation across multiple reconnect pages
+- [x] conversation messages can now carry structured attachment references instead of body-only file metadata
 
 ### 12.4 Completed repo-level validation work
 - [x] backend test suite continues to pass after the auth/session/conversation endpoint additions
@@ -225,7 +227,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 
 ### 13.1 IM backend priorities before calling the baseline complete
 - [ ] replace seeded in-memory conversation/message responses with real structured persistence
-- [ ] add sync cursor / recent-window continuation semantics instead of static list-only responses
+- [x] add sync cursor / recent-window continuation semantics instead of static list-only responses
 - [ ] add server-driven delivery receipt and read-state sync
 - [ ] add idempotent send semantics and duplicate suppression for message retries
 - [ ] add server-managed group membership and conversation ownership rules instead of purely synthetic thread generation
@@ -233,7 +235,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 ### 13.2 Media and realtime follow-up
 - [x] SSE event streams now emit stable event ids, heartbeat frames, and reconnect resume support via Last-Event-ID
 - [ ] add upload-session creation APIs for image / voice / video payloads
-- [ ] add media metadata records and attachment references in message envelopes
+- [x] add media metadata records and attachment references in message envelopes
 - [ ] add RTC signaling APIs for 1v1 audio/video sessions
 
 ### 13.3 Reliability and security follow-up
