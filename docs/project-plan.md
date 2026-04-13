@@ -231,6 +231,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 - [ ] add server-managed group membership and conversation ownership rules instead of purely synthetic thread generation
 
 ### 13.2 Media and realtime follow-up
+- [x] SSE event streams now emit stable event ids, heartbeat frames, and reconnect resume support via Last-Event-ID
 - [ ] add upload-session creation APIs for image / voice / video payloads
 - [ ] add media metadata records and attachment references in message envelopes
 - [ ] add RTC signaling APIs for 1v1 audio/video sessions
@@ -238,7 +239,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 ### 13.3 Reliability and security follow-up
 - [ ] define token lifecycle / expiry / refresh instead of current in-memory stage tokens
 - [ ] move auth/session state from in-memory-only token store to a persistence-backed design
-- [ ] add reconnect-aware diff sync and cursor validation rules
+- [x] add reconnect-aware diff sync and cursor validation rules
 - [ ] add explicit offline-window / retention policy beyond the current placeholder recent-window contract
 
 ## 14. Immediate Next Design Tasks
