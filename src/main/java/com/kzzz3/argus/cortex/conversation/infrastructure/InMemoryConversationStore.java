@@ -4,6 +4,7 @@ import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationMessageAttachment;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -49,12 +51,28 @@ public class InMemoryConversationStore implements ConversationStore {
 			return new ConversationMessagePage(List.of(), threadState.cursor(), recentWindowDays, limit);
 		}
 
+		ConversationSyncCursor currentCursor = ConversationSyncCursor.parse(conversationId, threadState.cursor());
+		ConversationSyncCursor requestedCursor = ConversationSyncCursor.parse(conversationId, sinceCursor);
+
+		if (requestedCursor != null && currentCursor != null) {
+			if (currentCursor.sequence() == requestedCursor.sequence() && currentCursor.revision() > requestedCursor.revision()) {
+				return new ConversationMessagePage(List.of(), threadState.cursor(), recentWindowDays, limit);
+			}
+			if (currentCursor.sequence() > requestedCursor.sequence()) {
+				List<ConversationMessage> continuationMessages = threadState.messagesAfter(requestedCursor.sequence(), limit);
+				String nextCursor = continuationMessages.isEmpty()
+						? threadState.cursor()
+						: ConversationSyncCursor.of(conversationId, requestedCursor.sequence() + continuationMessages.size(), currentCursor.revision()).encoded();
+				return new ConversationMessagePage(continuationMessages, nextCursor, recentWindowDays, limit);
+			}
+		}
+
 		List<ConversationMessage> recentMessages = threadState.recentMessages(limit);
 		return new ConversationMessagePage(recentMessages, threadState.cursor(), recentWindowDays, limit);
 	}
 
 	@Override
-	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body) {
+	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body, @Nullable ConversationMessageAttachment attachment) {
 		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
 		if (clientMessageId != null && !clientMessageId.isBlank()) {
 			ConversationMessage existing = threadState.findByClientMessageId(clientMessageId);
@@ -70,7 +88,8 @@ public class InMemoryConversationStore implements ConversationStore {
 				"Now",
 				true,
 				"DELIVERED",
-				"2026-04-10T21:10:00+08:00"
+				"2026-04-10T21:10:00+08:00",
+				attachment
 		);
 		threadState.addMessage(sentMessage);
 		return sentMessage;
@@ -201,7 +220,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"09:24",
 								false,
 								"DELIVERED",
-								"2026-04-10T09:24:00+08:00"
+								"2026-04-10T09:24:00+08:00",
+								null
 						),
 						new ConversationMessage(
 								"msg-zhang-2",
@@ -211,7 +231,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"09:28",
 								true,
 								"DELIVERED",
-								"2026-04-10T09:28:00+08:00"
+								"2026-04-10T09:28:00+08:00",
+						null
 						)
 				)),
 				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San"))
@@ -231,7 +252,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"Yesterday",
 								false,
 								"DELIVERED",
-								"2026-04-09T20:00:00+08:00"
+								"2026-04-09T20:00:00+08:00",
+						null
 						)
 				)),
 				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San", "Li Si"))
@@ -251,7 +273,8 @@ public class InMemoryConversationStore implements ConversationStore {
 								"Mon",
 								false,
 								"SENT",
-								"2026-04-08T10:00:00+08:00"
+								"2026-04-08T10:00:00+08:00",
+						null
 						)
 				)),
 				new ArrayList<>(List.of(accountRecord.displayName(), "Li Si"))
@@ -267,7 +290,9 @@ public class InMemoryConversationStore implements ConversationStore {
 		private final List<ConversationMessage> messages;
 		private final List<String> members;
 		private int unreadCount;
-		private long version;
+		private long latestMessageSequence;
+		private long lastAffectedSequence;
+		private long syncRevision;
 
 		private ConversationThreadState(String id, String title, String subtitle, int unreadCount, List<ConversationMessage> messages, List<String> members) {
 			this.id = id;
@@ -276,7 +301,9 @@ public class InMemoryConversationStore implements ConversationStore {
 			this.unreadCount = unreadCount;
 			this.messages = messages;
 			this.members = members;
-			this.version = messages.size();
+			this.latestMessageSequence = messages.size();
+			this.lastAffectedSequence = latestMessageSequence;
+			this.syncRevision = latestMessageSequence;
 		}
 
 		private String preview() {
@@ -288,7 +315,7 @@ public class InMemoryConversationStore implements ConversationStore {
 		}
 
 		private String cursor() {
-			return "cursor-" + id + "-" + version;
+			return ConversationSyncCursor.of(id, lastAffectedSequence, syncRevision).encoded();
 		}
 
 		private ConversationSummary toSummary() {
@@ -305,18 +332,20 @@ public class InMemoryConversationStore implements ConversationStore {
 		private void ensureMember(String displayName) {
 			if (!members.contains(displayName)) {
 				members.add(displayName);
-				version += 1;
 			}
 		}
 
 		private void addMessage(ConversationMessage message) {
 			messages.add(message);
-			version += 1;
+			latestMessageSequence += 1;
+			lastAffectedSequence = latestMessageSequence;
+			syncRevision += 1;
 		}
 
 		private void markRead() {
 			unreadCount = 0;
-			version += 1;
+			lastAffectedSequence = Math.max(lastAffectedSequence, latestMessageSequence);
+			syncRevision += 1;
 		}
 
 		private ConversationMessage recallMessage(String displayName, String messageId) {
@@ -331,10 +360,12 @@ public class InMemoryConversationStore implements ConversationStore {
 							"Now",
 							true,
 							"RECALLED",
-							"2026-04-10T21:11:00+08:00"
+							"2026-04-10T21:11:00+08:00",
+							message.attachment()
 					);
 					messages.set(index, recalled);
-					version += 1;
+					lastAffectedSequence = Math.max(lastAffectedSequence, index + 1L);
+					syncRevision += 1;
 					return recalled;
 				}
 			}
@@ -359,10 +390,12 @@ public class InMemoryConversationStore implements ConversationStore {
 							message.timestampLabel(),
 							message.fromCurrentUser(),
 							nextStatus,
-							"2026-04-10T22:30:00+08:00"
+							"2026-04-10T22:30:00+08:00",
+							message.attachment()
 					);
 					messages.set(index, updated);
-					version += 1;
+					lastAffectedSequence = Math.max(lastAffectedSequence, index + 1L);
+					syncRevision += 1;
 					return updated;
 				}
 			}
@@ -371,7 +404,13 @@ public class InMemoryConversationStore implements ConversationStore {
 
 		private List<ConversationMessage> recentMessages(int limit) {
 			int fromIndex = Math.max(messages.size() - limit, 0);
-			return messages.subList(fromIndex, messages.size());
+			return new ArrayList<>(messages.subList(fromIndex, messages.size()));
+		}
+
+		private List<ConversationMessage> messagesAfter(long sequence, int limit) {
+			int fromIndex = Math.min(Math.max((int) sequence, 0), messages.size());
+			int toIndex = Math.min(fromIndex + limit, messages.size());
+			return new ArrayList<>(messages.subList(fromIndex, toIndex));
 		}
 
 		private ConversationMessage findByClientMessageId(String clientMessageId) {
