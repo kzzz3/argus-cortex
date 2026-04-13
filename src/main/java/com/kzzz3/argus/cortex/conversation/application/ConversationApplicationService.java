@@ -4,16 +4,17 @@ import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
-import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
 import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimeEvent;
 import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimeEventType;
+import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimeMessagePayload;
 import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimePublisher;
-import com.kzzz3.argus.cortex.conversation.web.CreateConversationRequest;
 import com.kzzz3.argus.cortex.conversation.web.AddConversationMemberRequest;
+import com.kzzz3.argus.cortex.conversation.web.CreateConversationRequest;
 import com.kzzz3.argus.cortex.conversation.web.MessageReceiptRequest;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
 import java.time.OffsetDateTime;
@@ -83,7 +84,7 @@ public class ConversationApplicationService {
                 request.clientMessageId().trim(),
                 request.body().trim()
         );
-        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_CREATED, message.id());
+        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_CREATED, message);
         return message;
     }
 
@@ -96,7 +97,7 @@ public class ConversationApplicationService {
         AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
                 .orElseThrow(InvalidCredentialsException::new);
         ConversationMessage message = conversationStore.applyReceipt(accountRecord, conversationId, messageId, request.receiptType().trim());
-        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_STATUS_UPDATED, message.id());
+        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_STATUS_UPDATED, message);
         return message;
     }
 
@@ -108,7 +109,7 @@ public class ConversationApplicationService {
         AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
                 .orElseThrow(InvalidCredentialsException::new);
         ConversationMessage message = conversationStore.recallMessage(accountRecord, conversationId, messageId);
-        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_RECALLED, message.id());
+        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_RECALLED, message);
         return message;
     }
 
@@ -148,8 +149,28 @@ public class ConversationApplicationService {
         return detail;
     }
 
-    private void publishRealtimeEvent(String conversationId, ConversationRealtimeEventType eventType, String messageId) {
-        conversationRealtimePublisher.publish(new ConversationRealtimeEvent(conversationId, eventType, messageId, OffsetDateTime.now().toString()));
+    private void publishRealtimeEvent(String conversationId, ConversationRealtimeEventType eventType, ConversationMessage message) {
+        conversationRealtimePublisher.publish(new ConversationRealtimeEvent(
+                "",
+                conversationId,
+                eventType,
+                message == null ? null : message.id(),
+                message == null ? null : toRealtimePayload(message),
+                OffsetDateTime.now().toString(),
+                false
+        ));
+    }
+
+    private ConversationRealtimeMessagePayload toRealtimePayload(ConversationMessage message) {
+        return new ConversationRealtimeMessagePayload(
+                message.id(),
+                message.conversationId(),
+                message.senderDisplayName(),
+                message.body(),
+                message.timestampLabel(),
+                message.deliveryStatus(),
+                message.statusUpdatedAt()
+        );
     }
 
     private int normalizeRecentWindowDays(int requestedWindowDays) {
