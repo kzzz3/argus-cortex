@@ -15,6 +15,7 @@ public class ConversationMessageEntity {
 	private String senderAccountId;
 	private String senderDisplayName;
 	private String body;
+	private String attachmentId;
 	private String timestampLabel;
 	private Boolean fromCurrentUser;
 	private String deliveryStatus;
@@ -36,6 +37,8 @@ public class ConversationMessageEntity {
 	public void setSenderDisplayName(String senderDisplayName) { this.senderDisplayName = senderDisplayName; }
 	public String getBody() { return body; }
 	public void setBody(String body) { this.body = body; }
+	public String getAttachmentId() { return attachmentId; }
+	public void setAttachmentId(String attachmentId) { this.attachmentId = attachmentId; }
 	public String getTimestampLabel() { return timestampLabel; }
 	public void setTimestampLabel(String timestampLabel) { this.timestampLabel = timestampLabel; }
 	public Boolean getFromCurrentUser() { return fromCurrentUser; }
