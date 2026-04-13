@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.conversation.domain;
 
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import java.util.List;
+import org.springframework.lang.Nullable;
 
 public interface ConversationStore {
 
@@ -17,7 +18,13 @@ public interface ConversationStore {
 			String sinceCursor
 	);
 
-	ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body);
+	ConversationMessage sendMessage(
+			AccountRecord accountRecord,
+			String conversationId,
+			String clientMessageId,
+			String body,
+			@Nullable ConversationMessageAttachment attachment
+	);
 
 	ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType);
 

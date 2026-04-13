@@ -1,5 +1,7 @@
 package com.kzzz3.argus.cortex.conversation.domain;
 
+import org.springframework.lang.Nullable;
+
 public record ConversationMessage(
 		String id,
 		String conversationId,
@@ -8,6 +10,7 @@ public record ConversationMessage(
 		String timestampLabel,
 		boolean fromCurrentUser,
 		String deliveryStatus,
-		String statusUpdatedAt
+		String statusUpdatedAt,
+		@Nullable ConversationMessageAttachment attachment
 ) {
 }
