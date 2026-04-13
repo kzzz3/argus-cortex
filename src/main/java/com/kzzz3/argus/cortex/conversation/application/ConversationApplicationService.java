@@ -6,6 +6,7 @@ import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
+import com.kzzz3.argus.cortex.conversation.domain.ConversationMessageAttachment;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessagePage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationSummary;
@@ -14,11 +15,15 @@ import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimeEventTyp
 import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimeMessagePayload;
 import com.kzzz3.argus.cortex.conversation.realtime.ConversationRealtimePublisher;
 import com.kzzz3.argus.cortex.conversation.web.AddConversationMemberRequest;
+import com.kzzz3.argus.cortex.conversation.web.ConversationMessageAttachmentRequest;
 import com.kzzz3.argus.cortex.conversation.web.CreateConversationRequest;
 import com.kzzz3.argus.cortex.conversation.web.MessageReceiptRequest;
 import com.kzzz3.argus.cortex.conversation.web.SendMessageRequest;
+import com.kzzz3.argus.cortex.media.domain.MediaAttachmentRecord;
+import com.kzzz3.argus.cortex.media.domain.MediaAttachmentStore;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -31,17 +36,20 @@ public class ConversationApplicationService {
     private final AccountStore accountStore;
     private final ConversationStore conversationStore;
     private final ConversationRealtimePublisher conversationRealtimePublisher;
+    private final MediaAttachmentStore mediaAttachmentStore;
 
     public ConversationApplicationService(
             AccessTokenStore accessTokenStore,
             AccountStore accountStore,
             ConversationStore conversationStore,
-            ConversationRealtimePublisher conversationRealtimePublisher
+            ConversationRealtimePublisher conversationRealtimePublisher,
+            MediaAttachmentStore mediaAttachmentStore
     ) {
         this.accessTokenStore = accessTokenStore;
         this.accountStore = accountStore;
         this.conversationStore = conversationStore;
         this.conversationRealtimePublisher = conversationRealtimePublisher;
+        this.mediaAttachmentStore = mediaAttachmentStore;
     }
 
     public List<ConversationSummary> listConversations(String accessToken, int recentWindowDays) {
@@ -78,11 +86,14 @@ public class ConversationApplicationService {
     ) {
         AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
                 .orElseThrow(InvalidCredentialsException::new);
+        ConversationMessageAttachment attachment = resolveAttachment(accountRecord, conversationId, request.attachment());
+        String normalizedBody = normalizeMessageBody(request.body(), attachment);
         ConversationMessage message = conversationStore.sendMessage(
                 accountRecord,
                 conversationId,
                 request.clientMessageId().trim(),
-                request.body().trim()
+                normalizedBody,
+                attachment
         );
         publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_CREATED, message);
         return message;
@@ -169,8 +180,46 @@ public class ConversationApplicationService {
                 message.body(),
                 message.timestampLabel(),
                 message.deliveryStatus(),
-                message.statusUpdatedAt()
+                message.statusUpdatedAt(),
+                message.attachment()
         );
+    }
+
+    @Nullable
+    private ConversationMessageAttachment resolveAttachment(
+            AccountRecord accountRecord,
+            String conversationId,
+            @Nullable ConversationMessageAttachmentRequest attachmentRequest
+    ) {
+        if (attachmentRequest == null || attachmentRequest.attachmentId() == null || attachmentRequest.attachmentId().isBlank()) {
+            return null;
+        }
+        MediaAttachmentRecord attachmentRecord = mediaAttachmentStore.findByAttachmentId(attachmentRequest.attachmentId().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Attachment not found."));
+        if (!accountRecord.accountId().equals(attachmentRecord.accountId())) {
+            throw new IllegalArgumentException("Attachment does not belong to the authenticated account.");
+        }
+        if (attachmentRecord.conversationId() != null && !attachmentRecord.conversationId().equals(conversationId)) {
+            throw new IllegalArgumentException("Attachment does not belong to the requested conversation.");
+        }
+        return new ConversationMessageAttachment(
+                attachmentRecord.attachmentId(),
+                attachmentRecord.attachmentType().name(),
+                attachmentRecord.fileName(),
+                attachmentRecord.contentType(),
+                attachmentRecord.contentLength()
+        );
+    }
+
+    private String normalizeMessageBody(@Nullable String rawBody, @Nullable ConversationMessageAttachment attachment) {
+        String normalizedBody = rawBody == null ? "" : rawBody.trim();
+        if (!normalizedBody.isEmpty()) {
+            return normalizedBody;
+        }
+        if (attachment != null) {
+            return attachment.fileName();
+        }
+        throw new IllegalArgumentException("Message body or attachment is required.");
     }
 
     private int normalizeRecentWindowDays(int requestedWindowDays) {

@@ -1,5 +1,8 @@
 package com.kzzz3.argus.cortex.conversation.realtime;
 
+import com.kzzz3.argus.cortex.conversation.domain.ConversationMessageAttachment;
+import org.springframework.lang.Nullable;
+
 public record ConversationRealtimeMessagePayload(
         String id,
         String conversationId,
@@ -7,6 +10,7 @@ public record ConversationRealtimeMessagePayload(
         String body,
         String timestampLabel,
         String deliveryStatus,
-        String statusUpdatedAt
+        String statusUpdatedAt,
+        @Nullable ConversationMessageAttachment attachment
 ) {
 }
