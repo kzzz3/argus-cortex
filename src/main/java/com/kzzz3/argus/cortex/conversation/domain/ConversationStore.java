@@ -2,7 +2,7 @@ package com.kzzz3.argus.cortex.conversation.domain;
 
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public interface ConversationStore {
 

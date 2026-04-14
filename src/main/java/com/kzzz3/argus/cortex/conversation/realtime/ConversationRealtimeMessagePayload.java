@@ -1,7 +1,7 @@
 package com.kzzz3.argus.cortex.conversation.realtime;
 
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessageAttachment;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public record ConversationRealtimeMessagePayload(
         String id,

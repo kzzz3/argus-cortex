@@ -1,6 +1,6 @@
 package com.kzzz3.argus.cortex.conversation.domain;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public record ConversationMessage(
 		String id,
