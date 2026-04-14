@@ -6,9 +6,11 @@ import com.kzzz3.argus.cortex.media.domain.MediaAttachmentType;
 import com.kzzz3.argus.cortex.media.infrastructure.entity.MediaAttachmentEntity;
 import com.kzzz3.argus.cortex.media.infrastructure.mapper.MediaAttachmentMapper;
 import java.util.Optional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "argus.persistence.mode", havingValue = "mysql", matchIfMissing = true)
 public class MyBatisMediaAttachmentStore implements MediaAttachmentStore {
 
     private final MediaAttachmentMapper mediaAttachmentMapper;

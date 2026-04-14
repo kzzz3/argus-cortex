@@ -9,13 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -31,29 +29,18 @@ class TextImFlowIntegrationTest {
 	@Autowired
 	private WebApplicationContext webApplicationContext;
 
-	@Autowired
-	private DataSource dataSource;
-
 	@BeforeEach
 	void setUp() {
 		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
-		JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-		jdbcTemplate.execute("""
-				CREATE TABLE IF NOT EXISTS media_attachment (
-				    attachment_id VARCHAR(128) PRIMARY KEY,
-				    session_id VARCHAR(128) NOT NULL,
-				    account_id VARCHAR(64) NOT NULL,
-				    conversation_id VARCHAR(64),
-				    attachment_type VARCHAR(32) NOT NULL,
-				    file_name VARCHAR(255) NOT NULL,
-				    content_type VARCHAR(128) NOT NULL,
-				    content_length BIGINT NOT NULL,
-				    object_key VARCHAR(255) NOT NULL,
-				    upload_url VARCHAR(1024) NOT NULL,
-				    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-				    CONSTRAINT uk_media_attachment_session UNIQUE (session_id)
-				)
-				""");
+	}
+
+	@Test
+	void malformedAuthorizationHeaderReturnsBadRequest() throws Exception {
+		mockMvc.perform(get("/api/v1/conversations")
+						.header("Authorization", "Token invalid"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+				.andExpect(jsonPath("$.message").value("Authorization header must use Bearer token."));
 	}
 
 	@Test
@@ -74,7 +61,7 @@ class TextImFlowIntegrationTest {
 		mockMvc.perform(get("/api/v1/friends")
 						.header("Authorization", bearer(accessToken)))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$", hasSize(2)));
+				.andExpect(jsonPath("$", hasSize(1)));
 
 		MvcResult conversationsResult = mockMvc.perform(get("/api/v1/conversations")
 						.header("Authorization", bearer(accessToken))
@@ -264,6 +251,15 @@ class TextImFlowIntegrationTest {
 								"""))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.deliveryStatus").value("READ"));
+
+		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/receipt", conversationId, firstMessageId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"receiptType":"BROKEN"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
 		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
 						.header("Authorization", bearer(accessToken))

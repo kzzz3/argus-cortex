@@ -1,6 +1,8 @@
 package com.kzzz3.argus.cortex.friend.web;
 
+import com.kzzz3.argus.cortex.friend.application.AddFriendCommand;
 import com.kzzz3.argus.cortex.friend.application.FriendApplicationService;
+import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +24,7 @@ public class FriendController {
 
 	@GetMapping
 	public List<FriendResponse> listFriends(@RequestHeader("Authorization") String authorizationHeader) {
-		return friendApplicationService.listFriends(extractBearerToken(authorizationHeader))
+		return friendApplicationService.listFriends(BearerTokenExtractor.extract(authorizationHeader))
 				.stream()
 				.map(FriendResponse::from)
 				.toList();
@@ -33,19 +35,9 @@ public class FriendController {
 			@RequestHeader("Authorization") String authorizationHeader,
 			@Valid @RequestBody AddFriendRequest request
 	) {
-		return FriendResponse.from(friendApplicationService.addFriend(extractBearerToken(authorizationHeader), request));
-	}
-
-	private String extractBearerToken(String authorizationHeader) {
-		if (authorizationHeader == null) {
-			throw new IllegalArgumentException("Missing Authorization header.");
-		}
-
-		String prefix = "Bearer ";
-		if (!authorizationHeader.startsWith(prefix)) {
-			throw new IllegalArgumentException("Authorization header must use Bearer token.");
-		}
-
-		return authorizationHeader.substring(prefix.length()).trim();
+		return FriendResponse.from(friendApplicationService.addFriend(
+				BearerTokenExtractor.extract(authorizationHeader),
+				new AddFriendCommand(request.friendAccountId())
+		));
 	}
 }

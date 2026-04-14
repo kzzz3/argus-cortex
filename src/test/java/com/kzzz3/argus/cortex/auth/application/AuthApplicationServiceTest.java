@@ -8,8 +8,6 @@ import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
 import com.kzzz3.argus.cortex.auth.infrastructure.InMemoryAccountStore;
 import com.kzzz3.argus.cortex.auth.infrastructure.UuidAccessTokenIssuer;
-import com.kzzz3.argus.cortex.auth.web.LoginRequest;
-import com.kzzz3.argus.cortex.auth.web.RegisterRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,20 +17,22 @@ class AuthApplicationServiceTest {
 
 	@BeforeEach
 	void setUp() {
+		UuidAccessTokenIssuer accessTokenIssuer = new UuidAccessTokenIssuer();
 		authApplicationService = new AuthApplicationService(
 				new InMemoryAccountStore(),
-				new UuidAccessTokenIssuer()
+				accessTokenIssuer,
+				new AuthenticatedAccountResolver(accessTokenIssuer)
 		);
 	}
 
 	@Test
 	void registerThenLoginReturnsServerSession() {
 		AuthResult registerResult = authApplicationService.register(
-				new RegisterRequest("Argus Tester", "tester", "secret123")
+				new RegisterCommand("Argus Tester", "tester", "secret123")
 		);
 
 		AuthResult loginResult = authApplicationService.login(
-				new LoginRequest("tester", "secret123")
+				new LoginCommand("tester", "secret123")
 		);
 
 		assertEquals("tester", registerResult.accountId());
@@ -44,21 +44,21 @@ class AuthApplicationServiceTest {
 
 	@Test
 	void duplicateRegisterThrowsConflict() {
-		authApplicationService.register(new RegisterRequest("Argus Tester", "tester-2", "secret123"));
+		authApplicationService.register(new RegisterCommand("Argus Tester", "tester-2", "secret123"));
 
 		assertThrows(
 				RegistrationConflictException.class,
-				() -> authApplicationService.register(new RegisterRequest("Argus Tester", "tester-2", "secret123"))
+				() -> authApplicationService.register(new RegisterCommand("Argus Tester", "tester-2", "secret123"))
 		);
 	}
 
 	@Test
 	void loginWithWrongPasswordThrowsUnauthorized() {
-		authApplicationService.register(new RegisterRequest("Argus Tester", "tester-3", "secret123"));
+		authApplicationService.register(new RegisterCommand("Argus Tester", "tester-3", "secret123"));
 
 		assertThrows(
 				InvalidCredentialsException.class,
-				() -> authApplicationService.login(new LoginRequest("tester-3", "wrongpass"))
+				() -> authApplicationService.login(new LoginCommand("tester-3", "wrongpass"))
 		);
 	}
 }

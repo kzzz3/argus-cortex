@@ -42,6 +42,18 @@ public class GlobalApiExceptionHandler {
 				.body(new ApiErrorResponse("VALIDATION_ERROR", message));
 	}
 
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(new ApiErrorResponse("BAD_REQUEST", exception.getMessage()));
+	}
+
+	@ExceptionHandler(IllegalStateException.class)
+	public ResponseEntity<ApiErrorResponse> handleIllegalState(IllegalStateException exception) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body(new ApiErrorResponse("STATE_ERROR", exception.getMessage()));
+	}
+
 	@ExceptionHandler(ConversationNotFoundException.class)
 	public ResponseEntity<ApiErrorResponse> handleConversationNotFound(ConversationNotFoundException exception) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)

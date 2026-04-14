@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS conversation_message (
     sender_account_id VARCHAR(64) NOT NULL,
     sender_display_name VARCHAR(128) NOT NULL,
     body TEXT NOT NULL,
+    attachment_id VARCHAR(128),
     timestamp_label VARCHAR(64) NOT NULL,
     from_current_user BOOLEAN NOT NULL,
     delivery_status VARCHAR(32) NOT NULL,
@@ -59,4 +60,19 @@ CREATE TABLE IF NOT EXISTS conversation_message (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_conversation_message_sequence UNIQUE (owner_account_id, conversation_id, sequence_no),
     CONSTRAINT uk_conversation_message_client UNIQUE (owner_account_id, conversation_id, client_message_id)
+);
+
+CREATE TABLE IF NOT EXISTS media_attachment (
+    attachment_id VARCHAR(128) PRIMARY KEY,
+    session_id VARCHAR(128) NOT NULL,
+    account_id VARCHAR(64) NOT NULL,
+    conversation_id VARCHAR(64),
+    attachment_type VARCHAR(32) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(128) NOT NULL,
+    content_length BIGINT NOT NULL,
+    object_key VARCHAR(255) NOT NULL,
+    upload_url VARCHAR(1024) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_media_attachment_session UNIQUE (session_id)
 );

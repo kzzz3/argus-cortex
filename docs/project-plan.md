@@ -222,6 +222,10 @@ The global project is split into eight execution phases, but Cortex only owns th
 ### 12.4 Completed repo-level validation work
 - [x] backend test suite continues to pass after the auth/session/conversation endpoint additions
 - [x] current Android remote auth and conversation slices can compile against these backend contracts
+- [x] shared bearer-token parsing and authenticated-account resolution are centralized instead of being repeated across controllers and services
+- [x] application services now accept application-layer commands rather than importing web request DTOs directly
+- [x] development schema now uses a single v1 Flyway baseline migration instead of a forward-compatibility migration chain
+- [x] conversation/friend stores no longer auto-seed demo contacts or sample threads; empty state now means truly empty persisted state
 
 ## 13. Next-Phase Checklist
 

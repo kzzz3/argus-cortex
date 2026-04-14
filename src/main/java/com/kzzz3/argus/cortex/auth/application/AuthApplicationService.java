@@ -5,8 +5,6 @@ import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
-import com.kzzz3.argus.cortex.auth.web.LoginRequest;
-import com.kzzz3.argus.cortex.auth.web.RegisterRequest;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,13 +12,19 @@ public class AuthApplicationService {
 
 	private final AccountStore accountStore;
 	private final AccessTokenStore accessTokenStore;
+	private final AuthenticatedAccountResolver authenticatedAccountResolver;
 
-	public AuthApplicationService(AccountStore accountStore, AccessTokenStore accessTokenStore) {
+	public AuthApplicationService(
+			AccountStore accountStore,
+			AccessTokenStore accessTokenStore,
+			AuthenticatedAccountResolver authenticatedAccountResolver
+	) {
 		this.accountStore = accountStore;
 		this.accessTokenStore = accessTokenStore;
+		this.authenticatedAccountResolver = authenticatedAccountResolver;
 	}
 
-	public AuthResult register(RegisterRequest request) {
+	public AuthResult register(RegisterCommand request) {
 		String normalizedAccount = normalizeAccount(request.account());
 		if (accountStore.exists(normalizedAccount)) {
 			throw new RegistrationConflictException(normalizedAccount);
@@ -42,7 +46,7 @@ public class AuthApplicationService {
 		);
 	}
 
-	public AuthResult login(LoginRequest request) {
+	public AuthResult login(LoginCommand request) {
 		String normalizedAccount = normalizeAccount(request.account());
 		AccountRecord accountRecord = accountStore.findByAccountId(normalizedAccount)
 				.orElseThrow(InvalidCredentialsException::new);
@@ -60,8 +64,7 @@ public class AuthApplicationService {
 	}
 
 	public AuthResult restoreSession(String accessToken) {
-		AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
-				.orElseThrow(InvalidCredentialsException::new);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
 
 		return new AuthResult(
 				accountRecord.accountId(),

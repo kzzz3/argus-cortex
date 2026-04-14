@@ -1,6 +1,9 @@
 package com.kzzz3.argus.cortex.auth.web;
 
 import com.kzzz3.argus.cortex.auth.application.AuthApplicationService;
+import com.kzzz3.argus.cortex.auth.application.LoginCommand;
+import com.kzzz3.argus.cortex.auth.application.RegisterCommand;
+import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -21,31 +24,22 @@ public class AuthController {
 
 	@PostMapping("/register")
 	public AuthSuccessResponse register(@Valid @RequestBody RegisterRequest request) {
-		return AuthSuccessResponse.from(authApplicationService.register(request));
+		return AuthSuccessResponse.from(authApplicationService.register(
+				new RegisterCommand(request.displayName(), request.account(), request.password())
+		));
 	}
 
 	@PostMapping("/login")
 	public AuthSuccessResponse login(@Valid @RequestBody LoginRequest request) {
-		return AuthSuccessResponse.from(authApplicationService.login(request));
+		return AuthSuccessResponse.from(authApplicationService.login(
+				new LoginCommand(request.account(), request.password())
+		));
 	}
 
 	@GetMapping("/session/me")
 	public AuthSuccessResponse restoreSession(@RequestHeader("Authorization") String authorizationHeader) {
 		return AuthSuccessResponse.from(
-				authApplicationService.restoreSession(extractBearerToken(authorizationHeader))
+				authApplicationService.restoreSession(BearerTokenExtractor.extract(authorizationHeader))
 		);
-	}
-
-	private String extractBearerToken(String authorizationHeader) {
-		if (authorizationHeader == null) {
-			throw new IllegalArgumentException("Missing Authorization header.");
-		}
-
-		String prefix = "Bearer ";
-		if (!authorizationHeader.startsWith(prefix)) {
-			throw new IllegalArgumentException("Authorization header must use Bearer token.");
-		}
-
-		return authorizationHeader.substring(prefix.length()).trim();
 	}
 }

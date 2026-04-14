@@ -1,8 +1,7 @@
 package com.kzzz3.argus.cortex.media.application;
 
-import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
+import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
-import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentRecord;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentStore;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentType;
@@ -10,8 +9,6 @@ import com.kzzz3.argus.cortex.media.domain.MediaUploadSession;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSessionStore;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaContentStorage;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaStorageProperties;
-import com.kzzz3.argus.cortex.media.web.CreateMediaUploadSessionRequest;
-import com.kzzz3.argus.cortex.media.web.FinalizeMediaUploadRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -22,29 +19,28 @@ import org.springframework.stereotype.Service;
 @Service
 public class MediaUploadSessionApplicationService {
 
-    private final AccessTokenStore accessTokenStore;
-    private final MediaUploadSessionStore mediaUploadSessionStore;
+	private final AuthenticatedAccountResolver authenticatedAccountResolver;
+	private final MediaUploadSessionStore mediaUploadSessionStore;
     private final MediaAttachmentStore mediaAttachmentStore;
     private final MediaStorageProperties mediaStorageProperties;
     private final MediaContentStorage mediaContentStorage;
 
-    public MediaUploadSessionApplicationService(
-            AccessTokenStore accessTokenStore,
-            MediaUploadSessionStore mediaUploadSessionStore,
+	public MediaUploadSessionApplicationService(
+			AuthenticatedAccountResolver authenticatedAccountResolver,
+			MediaUploadSessionStore mediaUploadSessionStore,
             MediaAttachmentStore mediaAttachmentStore,
             MediaStorageProperties mediaStorageProperties,
             MediaContentStorage mediaContentStorage
     ) {
-        this.accessTokenStore = accessTokenStore;
+		this.authenticatedAccountResolver = authenticatedAccountResolver;
         this.mediaUploadSessionStore = mediaUploadSessionStore;
         this.mediaAttachmentStore = mediaAttachmentStore;
         this.mediaStorageProperties = mediaStorageProperties;
         this.mediaContentStorage = mediaContentStorage;
     }
 
-    public MediaUploadSession createUploadSession(String accessToken, CreateMediaUploadSessionRequest request) {
-        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
-                .orElseThrow(InvalidCredentialsException::new);
+	public MediaUploadSession createUploadSession(String accessToken, CreateMediaUploadSessionCommand request) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
         String normalizedFileName = request.fileName().trim();
         MediaAttachmentType attachmentType = request.attachmentType();
         long normalizedEstimatedBytes = Math.max(1, request.estimatedBytes());
@@ -75,12 +71,11 @@ public class MediaUploadSessionApplicationService {
         return mediaUploadSessionStore.save(session);
     }
 
-    public void uploadContent(String accessToken, String sessionId, byte[] content) {
+	public void uploadContent(String accessToken, String sessionId, byte[] content) {
         if (content == null) {
             throw new IllegalArgumentException("Upload payload is required.");
         }
-        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
-                .orElseThrow(InvalidCredentialsException::new);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
         MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
         if (!session.accountId().equals(accountRecord.accountId())) {
@@ -98,13 +93,12 @@ public class MediaUploadSessionApplicationService {
         mediaUploadSessionStore.markUploaded(sessionId, objectKey);
     }
 
-    public MediaAttachmentRecord finalizeUploadSession(
-            String accessToken,
-            String sessionId,
-            FinalizeMediaUploadRequest request
-    ) {
-        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
-                .orElseThrow(InvalidCredentialsException::new);
+	public MediaAttachmentRecord finalizeUploadSession(
+			String accessToken,
+			String sessionId,
+			FinalizeMediaUploadCommand request
+	) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
         MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
         if (!session.accountId().equals(accountRecord.accountId())) {
@@ -121,9 +115,8 @@ public class MediaUploadSessionApplicationService {
         return mediaAttachmentStore.save(attachmentRecord);
     }
 
-    public MediaAttachmentDownload loadAttachment(String accessToken, String attachmentId) {
-        AccountRecord accountRecord = accessTokenStore.findByToken(accessToken)
-                .orElseThrow(InvalidCredentialsException::new);
+	public MediaAttachmentDownload loadAttachment(String accessToken, String attachmentId) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
         MediaAttachmentRecord record = mediaAttachmentStore.findByAttachmentId(attachmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Media attachment not found."));
         if (!accountRecord.accountId().equals(record.accountId())) {
@@ -140,7 +133,7 @@ public class MediaUploadSessionApplicationService {
         return new MediaAttachmentDownload(record, content);
     }
 
-    private MediaAttachmentRecord buildAttachmentRecord(MediaUploadSession session, FinalizeMediaUploadRequest request) {
+	private MediaAttachmentRecord buildAttachmentRecord(MediaUploadSession session, FinalizeMediaUploadCommand request) {
         return new MediaAttachmentRecord(
                 UUID.randomUUID().toString(),
                 session.sessionId(),

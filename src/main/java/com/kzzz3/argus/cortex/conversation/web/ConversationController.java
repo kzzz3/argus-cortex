@@ -1,6 +1,11 @@
 package com.kzzz3.argus.cortex.conversation.web;
 
 import com.kzzz3.argus.cortex.conversation.application.ConversationApplicationService;
+import com.kzzz3.argus.cortex.conversation.application.AddConversationMemberCommand;
+import com.kzzz3.argus.cortex.conversation.application.ApplyMessageReceiptCommand;
+import com.kzzz3.argus.cortex.conversation.application.CreateConversationCommand;
+import com.kzzz3.argus.cortex.conversation.application.SendMessageCommand;
+import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +33,7 @@ public class ConversationController {
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
 		return conversationApplicationService.listConversations(
-				extractBearerToken(authorizationHeader),
+				BearerTokenExtractor.extract(authorizationHeader),
 				recentWindowDays
 		)
 				.stream()
@@ -43,8 +48,8 @@ public class ConversationController {
 	) {
 		return ConversationSummaryResponse.from(
 				conversationApplicationService.createConversation(
-						extractBearerToken(authorizationHeader),
-						request
+						BearerTokenExtractor.extract(authorizationHeader),
+						new CreateConversationCommand(request.type(), request.title())
 				)
 		);
 	}
@@ -56,7 +61,7 @@ public class ConversationController {
 	) {
 		return ConversationDetailResponse.from(
 				conversationApplicationService.getConversationDetail(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId
 				)
 		);
@@ -70,9 +75,9 @@ public class ConversationController {
 	) {
 		return ConversationDetailResponse.from(
 				conversationApplicationService.addMember(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId,
-						request
+						new AddConversationMemberCommand(request.memberAccountId())
 				)
 		);
 	}
@@ -86,7 +91,7 @@ public class ConversationController {
 			@RequestHeader("Authorization") String authorizationHeader
 	) {
 		var page = conversationApplicationService.listMessages(
-				extractBearerToken(authorizationHeader),
+				BearerTokenExtractor.extract(authorizationHeader),
 				conversationId,
 				recentWindowDays,
 				limit,
@@ -109,9 +114,13 @@ public class ConversationController {
 	) {
 		return ConversationMessageResponse.from(
 				conversationApplicationService.sendMessage(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId,
-						request
+						new SendMessageCommand(
+								request.clientMessageId(),
+								request.body(),
+								request.attachment() == null ? null : request.attachment().attachmentId()
+						)
 				)
 		);
 	}
@@ -125,10 +134,10 @@ public class ConversationController {
 	) {
 		return ConversationMessageResponse.from(
 				conversationApplicationService.applyReceipt(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId,
 						messageId,
-						request
+						new ApplyMessageReceiptCommand(request.receiptType())
 				)
 		);
 	}
@@ -142,7 +151,7 @@ public class ConversationController {
 	) {
 		return ConversationMessageResponse.from(
 				conversationApplicationService.recallMessage(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId,
 						messageId
 				)
@@ -157,22 +166,9 @@ public class ConversationController {
 	) {
 		return ConversationSummaryResponse.from(
 				conversationApplicationService.markConversationRead(
-						extractBearerToken(authorizationHeader),
+						BearerTokenExtractor.extract(authorizationHeader),
 						conversationId
 				)
 		);
-	}
-
-	private String extractBearerToken(String authorizationHeader) {
-		if (authorizationHeader == null) {
-			throw new IllegalArgumentException("Missing Authorization header.");
-		}
-
-		String prefix = "Bearer ";
-		if (!authorizationHeader.startsWith(prefix)) {
-			throw new IllegalArgumentException("Authorization header must use Bearer token.");
-		}
-
-		return authorizationHeader.substring(prefix.length()).trim();
 	}
 }

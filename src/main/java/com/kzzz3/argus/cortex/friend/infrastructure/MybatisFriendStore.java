@@ -30,7 +30,6 @@ public class MybatisFriendStore implements FriendStore {
 
 	@Override
 	public List<FriendRecord> listFriends(AccountRecord owner) {
-		seedDefaultFriend(owner);
 		return friendRelationMapper.selectList(new LambdaQueryWrapper<FriendRelationEntity>()
 				.eq(FriendRelationEntity::getOwnerAccountId, owner.accountId())
 				.orderByAsc(FriendRelationEntity::getId))
@@ -55,17 +54,6 @@ public class MybatisFriendStore implements FriendStore {
 		friendRelationMapper.insert(createRelation(owner.accountId(), friend.accountId(), "Added from remote contact flow"));
 		friendRelationMapper.insert(createRelation(friend.accountId(), owner.accountId(), "Added from remote contact flow"));
 		return new FriendRecord(friend.accountId(), friend.displayName(), "Added from remote contact flow");
-	}
-
-	private void seedDefaultFriend(AccountRecord owner) {
-		if (owner.accountId().equals("zhangsan")) {
-			return;
-		}
-		long count = friendRelationMapper.selectCount(new LambdaQueryWrapper<FriendRelationEntity>()
-				.eq(FriendRelationEntity::getOwnerAccountId, owner.accountId()));
-		if (count == 0L) {
-			friendRelationMapper.insert(createRelation(owner.accountId(), "zhangsan", "Default remote contact"));
-		}
 	}
 
 	private FriendRelationEntity createRelation(String ownerAccountId, String friendAccountId, String note) {

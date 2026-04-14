@@ -27,14 +27,14 @@ public class InMemoryConversationStore implements ConversationStore {
 
 	@Override
 	public List<ConversationSummary> listConversations(AccountRecord accountRecord, int recentWindowDays) {
-		return getOrSeedConversations(accountRecord, recentWindowDays).values().stream()
+		return getOrCreateConversations(accountRecord).values().stream()
 				.map(ConversationThreadState::toSummary)
 				.toList();
 	}
 
 	@Override
 	public ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		return threadState.toDetail(accountRecord.displayName());
 	}
 
@@ -46,7 +46,7 @@ public class InMemoryConversationStore implements ConversationStore {
 			int limit,
 			String sinceCursor
 	) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, recentWindowDays);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		if (threadState.cursor().equals(sinceCursor)) {
 			return new ConversationMessagePage(List.of(), threadState.cursor(), recentWindowDays, limit);
 		}
@@ -73,7 +73,7 @@ public class InMemoryConversationStore implements ConversationStore {
 
 	@Override
 	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body, @Nullable ConversationMessageAttachment attachment) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		if (clientMessageId != null && !clientMessageId.isBlank()) {
 			ConversationMessage existing = threadState.findByClientMessageId(clientMessageId);
 			if (existing != null) {
@@ -97,19 +97,19 @@ public class InMemoryConversationStore implements ConversationStore {
 
 	@Override
 	public ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		return threadState.applyReceipt(messageId, receiptType);
 	}
 
 	@Override
 	public ConversationMessage recallMessage(AccountRecord accountRecord, String conversationId, String messageId) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		return threadState.recallMessage(accountRecord.displayName(), messageId);
 	}
 
 	@Override
 	public ConversationSummary markConversationRead(AccountRecord accountRecord, String conversationId) {
-		ConversationThreadState threadState = requireConversation(accountRecord, conversationId, 7);
+		ConversationThreadState threadState = requireConversation(accountRecord, conversationId);
 		threadState.markRead();
 		return threadState.toSummary();
 	}
@@ -117,7 +117,7 @@ public class InMemoryConversationStore implements ConversationStore {
 	@Override
 	public ConversationSummary ensureDirectConversation(AccountRecord owner, AccountRecord friend) {
 		String conversationId = directConversationId(owner.accountId(), friend.accountId());
-		ConversationThreadState ownerThread = getOrSeedConversations(owner, 7)
+		ConversationThreadState ownerThread = getOrCreateConversations(owner)
 				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
 						conversationId,
 						friend.displayName(),
@@ -126,7 +126,7 @@ public class InMemoryConversationStore implements ConversationStore {
 						new ArrayList<>(),
 						new ArrayList<>(List.of(owner.displayName(), friend.displayName()))
 				));
-		getOrSeedConversations(friend, 7)
+		getOrCreateConversations(friend)
 				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
 						conversationId,
 						owner.displayName(),
@@ -147,7 +147,7 @@ public class InMemoryConversationStore implements ConversationStore {
 			case "GROUP" -> "conv-group-" + UUID.randomUUID();
 			default -> "conv-group-" + UUID.randomUUID();
 		};
-		ConversationThreadState threadState = getOrSeedConversations(owner, 7)
+		ConversationThreadState threadState = getOrCreateConversations(owner)
 				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
 						conversationId,
 						normalizedTitle,
@@ -161,10 +161,10 @@ public class InMemoryConversationStore implements ConversationStore {
 
 	@Override
 	public ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member) {
-		ConversationThreadState ownerThread = requireConversation(owner, conversationId, 7);
+		ConversationThreadState ownerThread = requireConversation(owner, conversationId);
 		ownerThread.ensureMember(member.displayName());
 
-		ConversationThreadState memberThread = getOrSeedConversations(member, 7)
+		ConversationThreadState memberThread = getOrCreateConversations(member)
 				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
 						conversationId,
 						ownerThread.title,
@@ -185,102 +185,22 @@ public class InMemoryConversationStore implements ConversationStore {
 		return ownerThread.toDetail(owner.displayName());
 	}
 
-	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId, int recentWindowDays) {
-		ConversationThreadState threadState = getOrSeedConversations(accountRecord, recentWindowDays).get(conversationId);
+	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId) {
+		ConversationThreadState threadState = getOrCreateConversations(accountRecord).get(conversationId);
 		if (threadState == null) {
 			throw new ConversationNotFoundException(conversationId);
 		}
 		return threadState;
 	}
 
-	private LinkedHashMap<String, ConversationThreadState> getOrSeedConversations(AccountRecord accountRecord, int recentWindowDays) {
-		return conversationsByAccount.computeIfAbsent(accountRecord.accountId(), ignored -> seedConversations(accountRecord, recentWindowDays));
+	private LinkedHashMap<String, ConversationThreadState> getOrCreateConversations(AccountRecord accountRecord) {
+		return conversationsByAccount.computeIfAbsent(accountRecord.accountId(), ignored -> new LinkedHashMap<>());
 	}
 
 	private String directConversationId(String accountIdA, String accountIdB) {
 		return accountIdA.compareTo(accountIdB) < 0
 				? "conv-direct-" + accountIdA + "-" + accountIdB
 				: "conv-direct-" + accountIdB + "-" + accountIdA;
-	}
-
-	private LinkedHashMap<String, ConversationThreadState> seedConversations(AccountRecord accountRecord, int recentWindowDays) {
-		LinkedHashMap<String, ConversationThreadState> threads = new LinkedHashMap<>();
-
-		threads.put("conv-zhang-san", new ConversationThreadState(
-				"conv-zhang-san",
-				"Zhang San",
-				"1:1 direct chat",
-				2,
-				new ArrayList<>(List.of(
-						new ConversationMessage(
-								"msg-zhang-1",
-								"conv-zhang-san",
-								"Zhang San",
-								"Remote message sync currently serves a recent " + recentWindowDays + "-day window.",
-								"09:24",
-								false,
-								"DELIVERED",
-								"2026-04-10T09:24:00+08:00",
-								null
-						),
-						new ConversationMessage(
-								"msg-zhang-2",
-								"conv-zhang-san",
-								accountRecord.displayName(),
-								"This reply comes from the authenticated Android account inside the remote recent window.",
-								"09:28",
-								true,
-								"DELIVERED",
-								"2026-04-10T09:28:00+08:00",
-						null
-						)
-				)),
-				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San"))
-		));
-
-		threads.put("conv-project-group", new ConversationThreadState(
-				"conv-project-group",
-				"Project Group",
-				"3 members",
-				0,
-				new ArrayList<>(List.of(
-						new ConversationMessage(
-								"msg-group-1",
-								"conv-project-group",
-								"Project Group",
-								"Next step: replace seeded windowed messages with real sync storage.",
-								"Yesterday",
-								false,
-								"DELIVERED",
-								"2026-04-09T20:00:00+08:00",
-						null
-						)
-				)),
-				new ArrayList<>(List.of(accountRecord.displayName(), "Zhang San", "Li Si"))
-		));
-
-		threads.put("conv-li-si", new ConversationThreadState(
-				"conv-li-si",
-				"Li Si",
-				"Feature review",
-				1,
-				new ArrayList<>(List.of(
-						new ConversationMessage(
-								"msg-li-si-1",
-								"conv-li-si",
-								"Li Si",
-								"Cursor-based sync is the next realistic IM step.",
-								"Mon",
-								false,
-								"SENT",
-								"2026-04-08T10:00:00+08:00",
-						null
-						)
-				)),
-				new ArrayList<>(List.of(accountRecord.displayName(), "Li Si"))
-		));
-
-		return threads;
 	}
 
 	private static final class ConversationThreadState {

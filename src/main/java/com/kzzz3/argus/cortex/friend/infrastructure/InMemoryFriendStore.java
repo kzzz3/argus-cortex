@@ -20,12 +20,12 @@ public class InMemoryFriendStore implements FriendStore {
 
 	@Override
 	public List<FriendRecord> listFriends(AccountRecord owner) {
-		return new ArrayList<>(friendsByAccount.computeIfAbsent(owner.accountId(), ignored -> seedFriends(owner)).values());
+		return new ArrayList<>(friendsByAccount.computeIfAbsent(owner.accountId(), ignored -> new LinkedHashMap<>()).values());
 	}
 
 	@Override
 	public FriendRecord addFriend(AccountRecord owner, AccountRecord friend) {
-		LinkedHashMap<String, FriendRecord> ownerFriends = friendsByAccount.computeIfAbsent(owner.accountId(), ignored -> seedFriends(owner));
+		LinkedHashMap<String, FriendRecord> ownerFriends = friendsByAccount.computeIfAbsent(owner.accountId(), ignored -> new LinkedHashMap<>());
 		if (ownerFriends.containsKey(friend.accountId())) {
 			throw new FriendAlreadyExistsException(friend.accountId());
 		}
@@ -37,13 +37,5 @@ public class InMemoryFriendStore implements FriendStore {
 		friendFriends.putIfAbsent(owner.accountId(), new FriendRecord(owner.accountId(), owner.displayName(), "Added from remote contact flow"));
 
 		return ownerView;
-	}
-
-	private LinkedHashMap<String, FriendRecord> seedFriends(AccountRecord owner) {
-		LinkedHashMap<String, FriendRecord> seeded = new LinkedHashMap<>();
-		if (!owner.accountId().equals("zhangsan")) {
-			seeded.put("zhangsan", new FriendRecord("zhangsan", "Zhang San", "Default remote contact"));
-		}
-		return seeded;
 	}
 }

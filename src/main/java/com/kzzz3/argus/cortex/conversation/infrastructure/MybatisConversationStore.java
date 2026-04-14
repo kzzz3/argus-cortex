@@ -47,7 +47,6 @@ public class MybatisConversationStore implements ConversationStore {
 
 	@Override
 	public List<ConversationSummary> listConversations(AccountRecord accountRecord, int recentWindowDays) {
-		seedConversations(accountRecord, recentWindowDays);
 		return threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
 				.eq(ConversationThreadEntity::getOwnerAccountId, accountRecord.accountId())
 				.orderByDesc(ConversationThreadEntity::getUpdatedAt))
@@ -231,7 +230,6 @@ public class MybatisConversationStore implements ConversationStore {
 	}
 
 	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
-		seedConversations(new AccountRecord(ownerAccountId, ownerAccountId, ""), recentWindowDays);
 		ConversationThreadEntity entity = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
 				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationThreadEntity::getConversationId, conversationId));
@@ -246,21 +244,6 @@ public class MybatisConversationStore implements ConversationStore {
 				.eq(ConversationMessageEntity::getId, messageId));
 		if (entity == null) throw new MessageNotFoundException(messageId);
 		return entity;
-	}
-
-	private void seedConversations(AccountRecord accountRecord, int recentWindowDays) {
-		long count = threadMapper.selectCount(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getOwnerAccountId, accountRecord.accountId()));
-		if (count > 0) return;
-
-		insertThread(accountRecord.accountId(), "conv-zhang-san", "Zhang San", "1:1 direct chat", 2);
-		insertThread(accountRecord.accountId(), "conv-project-group", "Project Group", "3 members", 0);
-		insertThread(accountRecord.accountId(), "conv-li-si", "Li Si", "Feature review", 1);
-
-		insertMessage(accountRecord.accountId(), "conv-zhang-san", 1L, "zhangsan", "Zhang San", "Remote message sync currently serves a recent " + recentWindowDays + "-day window.", false, "DELIVERED", "2026-04-10T09:24:00+08:00", "09:24");
-		insertMessage(accountRecord.accountId(), "conv-zhang-san", 2L, accountRecord.accountId(), accountRecord.displayName(), "This reply comes from the authenticated Android account inside the remote recent window.", true, "DELIVERED", "2026-04-10T09:28:00+08:00", "09:28");
-		insertMessage(accountRecord.accountId(), "conv-project-group", 1L, "project-group", "Project Group", "Next step: replace seeded windowed messages with real sync storage.", false, "DELIVERED", "2026-04-09T20:00:00+08:00", "Yesterday");
-		insertMessage(accountRecord.accountId(), "conv-li-si", 1L, "lisi", "Li Si", "Cursor-based sync is the next realistic IM step.", false, "SENT", "2026-04-08T10:00:00+08:00", "Mon");
 	}
 
 	private void insertThread(String ownerAccountId, String conversationId, String title, String subtitle, int unreadCount) {
@@ -308,29 +291,6 @@ public class MybatisConversationStore implements ConversationStore {
 				.eq(ConversationThreadEntity::getConversationId, conversationId));
 	}
 
-	private void insertMessage(String ownerAccountId, String conversationId, long sequenceNo, String senderAccountId, String senderDisplayName, String body, boolean fromCurrentUser, String deliveryStatus, String statusUpdatedAt, String timestampLabel) {
-		ConversationMessageEntity entity = new ConversationMessageEntity();
-		entity.setId("seed-" + conversationId + "-" + sequenceNo);
-		entity.setClientMessageId(entity.getId());
-		entity.setOwnerAccountId(ownerAccountId);
-		entity.setConversationId(conversationId);
-		entity.setSenderAccountId(senderAccountId);
-		entity.setSenderDisplayName(senderDisplayName);
-		entity.setBody(body);
-		entity.setTimestampLabel(timestampLabel);
-		entity.setFromCurrentUser(fromCurrentUser);
-		entity.setDeliveryStatus(deliveryStatus);
-		entity.setStatusUpdatedAt(statusUpdatedAt);
-		entity.setSequenceNo(sequenceNo);
-		entity.setCreatedAt(LocalDateTime.now());
-		messageMapper.insert(entity);
-		ConversationThreadEntity thread = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)
-				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		if (thread != null) {
-			advanceThreadCursor(thread, sequenceNo);
-		}
-	}
 
 	private long nextSequence(String ownerAccountId, String conversationId) {
 		return latestSequence(ownerAccountId, conversationId) + 1L;
