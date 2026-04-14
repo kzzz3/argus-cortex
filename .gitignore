@@ -3,6 +3,7 @@ build/
 out/
 logs/
 *.log
+.env
 
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
