@@ -6,6 +6,8 @@ import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import com.kzzz3.argus.cortex.friend.domain.FriendAlreadyExistsException;
 import com.kzzz3.argus.cortex.friend.domain.FriendTargetNotFoundException;
+import com.kzzz3.argus.cortex.payment.domain.PaymentMerchantNotFoundException;
+import com.kzzz3.argus.cortex.payment.domain.PaymentScanSessionNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -76,5 +78,17 @@ public class GlobalApiExceptionHandler {
 	public ResponseEntity<ApiErrorResponse> handleFriendTargetNotFound(FriendTargetNotFoundException exception) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(new ApiErrorResponse("FRIEND_TARGET_NOT_FOUND", exception.getMessage()));
+	}
+
+	@ExceptionHandler(PaymentMerchantNotFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handlePaymentMerchantNotFound(PaymentMerchantNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorResponse("PAYMENT_MERCHANT_NOT_FOUND", exception.getMessage()));
+	}
+
+	@ExceptionHandler(PaymentScanSessionNotFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handlePaymentScanSessionNotFound(PaymentScanSessionNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorResponse("PAYMENT_SCAN_SESSION_NOT_FOUND", exception.getMessage()));
 	}
 }

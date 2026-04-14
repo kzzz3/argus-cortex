@@ -76,3 +76,30 @@ CREATE TABLE IF NOT EXISTS media_attachment (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_media_attachment_session UNIQUE (session_id)
 );
+
+CREATE TABLE IF NOT EXISTS payment_scan_session (
+    session_id VARCHAR(128) PRIMARY KEY,
+    payer_account_id VARCHAR(64) NOT NULL,
+    merchant_account_id VARCHAR(64) NOT NULL,
+    merchant_display_name VARCHAR(128) NOT NULL,
+    currency VARCHAR(16) NOT NULL,
+    suggested_amount DECIMAL(12, 2),
+    amount_editable BOOLEAN NOT NULL,
+    suggested_note VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payment_record (
+    payment_id VARCHAR(128) PRIMARY KEY,
+    session_id VARCHAR(128) NOT NULL,
+    payer_account_id VARCHAR(64) NOT NULL,
+    merchant_account_id VARCHAR(64) NOT NULL,
+    merchant_display_name VARCHAR(128) NOT NULL,
+    conversation_id VARCHAR(64) NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    currency VARCHAR(16) NOT NULL,
+    note VARCHAR(255) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_payment_record_session UNIQUE (session_id)
+);

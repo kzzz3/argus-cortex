@@ -63,6 +63,42 @@ class TextImFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(1)));
 
+		MvcResult resolveScanResult = mockMvc.perform(post("/api/v1/payments/scan-sessions/resolve")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"scanPayload":"argus://pay?merchantAccountId=lisi&amount=18.88&note=Lunch%20set"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
+				.andExpect(jsonPath("$.merchantDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.suggestedAmount").value(18.88))
+				.andExpect(jsonPath("$.amountEditable").value(false))
+				.andReturn();
+
+		String scanSessionId = objectMapper.readTree(resolveScanResult.getResponse().getContentAsString()).get("scanSessionId").asText();
+
+		mockMvc.perform(post("/api/v1/payments/scan-sessions/{sessionId}/confirm", scanSessionId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"amount":18.88,"note":"Team lunch"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("COMPLETED"))
+				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
+				.andExpect(jsonPath("$.amount").value(18.88))
+				.andExpect(jsonPath("$.conversationId").value("conv-direct-lisi-tester"));
+
+		mockMvc.perform(post("/api/v1/payments/scan-sessions/resolve")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"scanPayload":"https://example.com/not-argus"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+
 		MvcResult conversationsResult = mockMvc.perform(get("/api/v1/conversations")
 						.header("Authorization", bearer(accessToken))
 						.param("recentWindowDays", "7"))
