@@ -14,9 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
@@ -46,8 +46,16 @@ class TextImFlowIntegrationTest {
 	@Test
 	void textImHappyPathWorksEndToEnd() throws Exception {
 		register("Zhang San", "zhangsan", "secret123");
-		register("Li Si", "lisi", "secret123");
+		String lisiAccessToken = registerAndReadAccessToken("Li Si", "lisi", "secret123");
 		String accessToken = registerAndReadAccessToken("Argus Tester", "tester", "secret123");
+
+		mockMvc.perform(get("/api/v1/payments/wallet")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accountId").value("tester"))
+				.andExpect(jsonPath("$.displayName").value("Argus Tester"))
+				.andExpect(jsonPath("$.balance").value(1000.00))
+				.andExpect(jsonPath("$.currency").value("CNY"));
 
 		mockMvc.perform(post("/api/v1/friends")
 						.header("Authorization", bearer(accessToken))
@@ -67,12 +75,12 @@ class TextImFlowIntegrationTest {
 						.header("Authorization", bearer(accessToken))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"scanPayload":"argus://pay?merchantAccountId=lisi&amount=18.88&note=Lunch%20set"}
+								{"scanPayload":"argus://pay?recipientAccountId=lisi&amount=18.88&note=Lunch%20set"}
 								"""))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
-				.andExpect(jsonPath("$.merchantDisplayName").value("Li Si"))
-				.andExpect(jsonPath("$.suggestedAmount").value(18.88))
+				.andExpect(jsonPath("$.recipientAccountId").value("lisi"))
+				.andExpect(jsonPath("$.recipientDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.requestedAmount").value(18.88))
 				.andExpect(jsonPath("$.amountEditable").value(false))
 				.andReturn();
 
@@ -88,14 +96,19 @@ class TextImFlowIntegrationTest {
 				.andExpect(jsonPath("$.scanSessionId").value(scanSessionId))
 				.andExpect(jsonPath("$.status").value("COMPLETED"))
 				.andExpect(jsonPath("$.payerAccountId").value("tester"))
-				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
+				.andExpect(jsonPath("$.payerDisplayName").value("Argus Tester"))
+				.andExpect(jsonPath("$.payerBalanceAfter").value(981.12))
+				.andExpect(jsonPath("$.recipientAccountId").value("lisi"))
+				.andExpect(jsonPath("$.recipientDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.recipientBalanceAfter").value(1018.88))
 				.andExpect(jsonPath("$.amount").value(18.88));
 
 		MvcResult paymentHistoryResult = mockMvc.perform(get("/api/v1/payments")
 						.header("Authorization", bearer(accessToken)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(1)))
-				.andExpect(jsonPath("$[0].merchantDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$[0].payerAccountId").value("tester"))
+				.andExpect(jsonPath("$[0].recipientAccountId").value("lisi"))
 				.andReturn();
 
 		String paymentId = objectMapper.readTree(paymentHistoryResult.getResponse().getContentAsString()).get(0).get("paymentId").asText();
@@ -106,9 +119,36 @@ class TextImFlowIntegrationTest {
 				.andExpect(jsonPath("$.paymentId").value(paymentId))
 				.andExpect(jsonPath("$.scanSessionId").value(scanSessionId))
 				.andExpect(jsonPath("$.payerAccountId").value("tester"))
-				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
-				.andExpect(jsonPath("$.merchantDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.payerDisplayName").value("Argus Tester"))
+				.andExpect(jsonPath("$.recipientAccountId").value("lisi"))
+				.andExpect(jsonPath("$.recipientDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.payerBalanceAfter").value(981.12))
+				.andExpect(jsonPath("$.recipientBalanceAfter").value(1018.88))
 				.andExpect(jsonPath("$.note").value("Team lunch"));
+
+		mockMvc.perform(get("/api/v1/payments/wallet")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.balance").value(981.12));
+
+		mockMvc.perform(get("/api/v1/payments")
+						.header("Authorization", bearer(lisiAccessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasSize(1)))
+				.andExpect(jsonPath("$[0].payerAccountId").value("tester"))
+				.andExpect(jsonPath("$[0].recipientAccountId").value("lisi"));
+
+		mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId)
+						.header("Authorization", bearer(lisiAccessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.paymentId").value(paymentId))
+				.andExpect(jsonPath("$.recipientAccountId").value("lisi"))
+				.andExpect(jsonPath("$.recipientBalanceAfter").value(1018.88));
+
+		mockMvc.perform(get("/api/v1/payments/wallet")
+						.header("Authorization", bearer(lisiAccessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.balance").value(1018.88));
 
 		mockMvc.perform(post("/api/v1/payments/scan-sessions/resolve")
 						.header("Authorization", bearer(accessToken))
@@ -123,7 +163,7 @@ class TextImFlowIntegrationTest {
 						.header("Authorization", bearer(accessToken))
 						.param("recentWindowDays", "7"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[?(@.id=='conv-direct-lisi-tester')]").exists())
+				.andExpect(jsonPath("$[?(@.id=='conv-direct-lisi-tester')]" ).exists())
 				.andReturn();
 
 		String conversationId = "conv-direct-lisi-tester";
@@ -378,6 +418,32 @@ class TextImFlowIntegrationTest {
 				.andExpect(jsonPath("$.title").value("Backend Group"))
 				.andExpect(jsonPath("$.memberCount").value(3))
 				.andExpect(jsonPath("$.memberDisplayNames", hasSize(3)));
+	}
+
+	@Test
+	void paymentRejectsTransfersThatExceedWalletBalance() throws Exception {
+		registerAndReadAccessToken("Receiver", "receiver", "secret123");
+		String accessToken = registerAndReadAccessToken("Payer", "payer", "secret123");
+
+		MvcResult resolveScanResult = mockMvc.perform(post("/api/v1/payments/scan-sessions/resolve")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"scanPayload":"argus://pay?recipientAccountId=receiver&amount=1200.00&note=Too%20much"}
+								"""))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		String scanSessionId = objectMapper.readTree(resolveScanResult.getResponse().getContentAsString()).get("scanSessionId").asText();
+
+		mockMvc.perform(post("/api/v1/payments/scan-sessions/{sessionId}/confirm", scanSessionId)
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"amount":1200.00,"note":"Still too much"}
+								"""))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("WALLET_BALANCE_INSUFFICIENT"));
 	}
 
 	private void register(String displayName, String accountId, String password) throws Exception {
