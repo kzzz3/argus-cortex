@@ -5,22 +5,22 @@ import java.math.BigDecimal;
 
 public record ResolvePaymentScanResponse(
 		String scanSessionId,
-		String merchantAccountId,
-		String merchantDisplayName,
+		String recipientAccountId,
+		String recipientDisplayName,
 		String currency,
-		BigDecimal suggestedAmount,
+		BigDecimal requestedAmount,
 		boolean amountEditable,
-		String suggestedNote
+		String requestedNote
 ) {
 	public static ResolvePaymentScanResponse from(PaymentScanSession session) {
 		return new ResolvePaymentScanResponse(
 				session.sessionId(),
-				session.merchantAccountId(),
-				session.merchantDisplayName(),
+				session.recipientAccountId(),
+				session.recipientDisplayName(),
 				session.currency(),
-				session.suggestedAmount(),
+				session.requestedAmount(),
 				session.amountEditable(),
-				session.suggestedNote()
+				session.requestedNote()
 		);
 	}
 }

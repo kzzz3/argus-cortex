@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 
 public record PaymentHistoryItemResponse(
 		String paymentId,
-		String merchantDisplayName,
+		String payerAccountId,
+		String payerDisplayName,
+		String recipientAccountId,
+		String recipientDisplayName,
 		BigDecimal amount,
 		String currency,
 		String status,
@@ -15,7 +18,10 @@ public record PaymentHistoryItemResponse(
 	public static PaymentHistoryItemResponse from(PaymentRecord paymentRecord) {
 		return new PaymentHistoryItemResponse(
 				paymentRecord.paymentId(),
-				paymentRecord.merchantDisplayName(),
+				paymentRecord.payerAccountId(),
+				paymentRecord.payerDisplayName(),
+				paymentRecord.recipientAccountId(),
+				paymentRecord.recipientDisplayName(),
 				paymentRecord.amount(),
 				paymentRecord.currency(),
 				paymentRecord.status(),
