@@ -3,9 +3,9 @@ package com.kzzz3.argus.cortex.payment.application;
 import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
-import com.kzzz3.argus.cortex.conversation.domain.ConversationStore;
 import com.kzzz3.argus.cortex.payment.domain.PaymentMerchantNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecord;
+import com.kzzz3.argus.cortex.payment.domain.PaymentRecordNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecordStore;
 import com.kzzz3.argus.cortex.payment.domain.PaymentScanSession;
 import com.kzzz3.argus.cortex.payment.domain.PaymentScanSessionNotFoundException;
@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -31,20 +32,17 @@ public class PaymentApplicationService {
 
 	private final AuthenticatedAccountResolver authenticatedAccountResolver;
 	private final AccountStore accountStore;
-	private final ConversationStore conversationStore;
 	private final PaymentScanSessionStore paymentScanSessionStore;
 	private final PaymentRecordStore paymentRecordStore;
 
 	public PaymentApplicationService(
 			AuthenticatedAccountResolver authenticatedAccountResolver,
 			AccountStore accountStore,
-			ConversationStore conversationStore,
 			PaymentScanSessionStore paymentScanSessionStore,
 			PaymentRecordStore paymentRecordStore
 	) {
 		this.authenticatedAccountResolver = authenticatedAccountResolver;
 		this.accountStore = accountStore;
-		this.conversationStore = conversationStore;
 		this.paymentScanSessionStore = paymentScanSessionStore;
 		this.paymentRecordStore = paymentRecordStore;
 	}
@@ -93,7 +91,6 @@ public class PaymentApplicationService {
 				.orElseThrow(() -> new PaymentMerchantNotFoundException(session.merchantAccountId()));
 		BigDecimal amount = resolvePaymentAmount(session, command.amount());
 		String note = resolvePaymentNote(session, command.note());
-		var conversation = conversationStore.ensureDirectConversation(payer, merchant);
 
 		PaymentRecord paymentRecord = new PaymentRecord(
 				"payment-" + UUID.randomUUID(),
@@ -101,7 +98,6 @@ public class PaymentApplicationService {
 				payer.accountId(),
 				merchant.accountId(),
 				session.merchantDisplayName(),
-				conversation.id(),
 				amount,
 				session.currency(),
 				note,
@@ -109,6 +105,17 @@ public class PaymentApplicationService {
 				LocalDateTime.now()
 		);
 		return paymentRecordStore.save(paymentRecord);
+	}
+
+	public List<PaymentRecord> listPayments(String accessToken) {
+		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+		return paymentRecordStore.listByPayerAccountId(payer.accountId());
+	}
+
+	public PaymentRecord getPaymentReceipt(String accessToken, String paymentId) {
+		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+		return paymentRecordStore.findByPaymentIdAndPayerAccountId(paymentId, payer.accountId())
+				.orElseThrow(() -> new PaymentRecordNotFoundException(paymentId));
 	}
 
 	private ParsedPaymentQr parseScanPayload(String scanPayload) {

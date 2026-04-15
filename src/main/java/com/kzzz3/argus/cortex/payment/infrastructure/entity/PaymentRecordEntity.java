@@ -14,7 +14,6 @@ public class PaymentRecordEntity {
 	private String payerAccountId;
 	private String merchantAccountId;
 	private String merchantDisplayName;
-	private String conversationId;
 	private BigDecimal amount;
 	private String currency;
 	private String note;
@@ -31,8 +30,6 @@ public class PaymentRecordEntity {
 	public void setMerchantAccountId(String merchantAccountId) { this.merchantAccountId = merchantAccountId; }
 	public String getMerchantDisplayName() { return merchantDisplayName; }
 	public void setMerchantDisplayName(String merchantDisplayName) { this.merchantDisplayName = merchantDisplayName; }
-	public String getConversationId() { return conversationId; }
-	public void setConversationId(String conversationId) { this.conversationId = conversationId; }
 	public BigDecimal getAmount() { return amount; }
 	public void setAmount(BigDecimal amount) { this.amount = amount; }
 	public String getCurrency() { return currency; }

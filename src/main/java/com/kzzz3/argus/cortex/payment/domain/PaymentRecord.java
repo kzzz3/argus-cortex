@@ -9,7 +9,6 @@ public record PaymentRecord(
 		String payerAccountId,
 		String merchantAccountId,
 		String merchantDisplayName,
-		String conversationId,
 		BigDecimal amount,
 		String currency,
 		String note,
