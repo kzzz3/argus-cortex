@@ -5,6 +5,8 @@ import com.kzzz3.argus.cortex.payment.application.PaymentApplicationService;
 import com.kzzz3.argus.cortex.payment.application.ResolvePaymentScanCommand;
 import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +22,26 @@ public class PaymentController {
 
 	public PaymentController(PaymentApplicationService paymentApplicationService) {
 		this.paymentApplicationService = paymentApplicationService;
+	}
+
+	@GetMapping
+	public List<PaymentHistoryItemResponse> listPayments(
+			@RequestHeader("Authorization") String authorizationHeader
+	) {
+		return paymentApplicationService.listPayments(BearerTokenExtractor.extract(authorizationHeader)).stream()
+				.map(PaymentHistoryItemResponse::from)
+				.toList();
+	}
+
+	@GetMapping("/{paymentId}")
+	public ConfirmPaymentResponse getPaymentReceipt(
+			@PathVariable String paymentId,
+			@RequestHeader("Authorization") String authorizationHeader
+	) {
+		return ConfirmPaymentResponse.from(paymentApplicationService.getPaymentReceipt(
+				BearerTokenExtractor.extract(authorizationHeader),
+				paymentId
+		));
 	}
 
 	@PostMapping("/scan-sessions/resolve")

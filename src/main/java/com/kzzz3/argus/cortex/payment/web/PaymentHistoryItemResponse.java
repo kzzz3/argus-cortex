@@ -4,29 +4,21 @@ import com.kzzz3.argus.cortex.payment.domain.PaymentRecord;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public record ConfirmPaymentResponse(
+public record PaymentHistoryItemResponse(
 		String paymentId,
-		String scanSessionId,
-		String status,
-		String payerAccountId,
-		String merchantAccountId,
 		String merchantDisplayName,
 		BigDecimal amount,
 		String currency,
-		String note,
+		String status,
 		LocalDateTime paidAt
 ) {
-	public static ConfirmPaymentResponse from(PaymentRecord paymentRecord) {
-		return new ConfirmPaymentResponse(
+	public static PaymentHistoryItemResponse from(PaymentRecord paymentRecord) {
+		return new PaymentHistoryItemResponse(
 				paymentRecord.paymentId(),
-				paymentRecord.sessionId(),
-				paymentRecord.status(),
-				paymentRecord.payerAccountId(),
-				paymentRecord.merchantAccountId(),
 				paymentRecord.merchantDisplayName(),
 				paymentRecord.amount(),
 				paymentRecord.currency(),
-				paymentRecord.note(),
+				paymentRecord.status(),
 				paymentRecord.createdAt()
 		);
 	}

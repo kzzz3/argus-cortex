@@ -95,7 +95,6 @@ CREATE TABLE IF NOT EXISTS payment_record (
     payer_account_id VARCHAR(64) NOT NULL,
     merchant_account_id VARCHAR(64) NOT NULL,
     merchant_display_name VARCHAR(128) NOT NULL,
-    conversation_id VARCHAR(64) NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
     currency VARCHAR(16) NOT NULL,
     note VARCHAR(255) NOT NULL,

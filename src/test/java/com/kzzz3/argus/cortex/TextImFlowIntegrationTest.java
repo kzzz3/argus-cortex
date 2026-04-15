@@ -85,10 +85,30 @@ class TextImFlowIntegrationTest {
 								{"amount":18.88,"note":"Team lunch"}
 								"""))
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.scanSessionId").value(scanSessionId))
 				.andExpect(jsonPath("$.status").value("COMPLETED"))
+				.andExpect(jsonPath("$.payerAccountId").value("tester"))
 				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
-				.andExpect(jsonPath("$.amount").value(18.88))
-				.andExpect(jsonPath("$.conversationId").value("conv-direct-lisi-tester"));
+				.andExpect(jsonPath("$.amount").value(18.88));
+
+		MvcResult paymentHistoryResult = mockMvc.perform(get("/api/v1/payments")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasSize(1)))
+				.andExpect(jsonPath("$[0].merchantDisplayName").value("Li Si"))
+				.andReturn();
+
+		String paymentId = objectMapper.readTree(paymentHistoryResult.getResponse().getContentAsString()).get(0).get("paymentId").asText();
+
+		mockMvc.perform(get("/api/v1/payments/{paymentId}", paymentId)
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.paymentId").value(paymentId))
+				.andExpect(jsonPath("$.scanSessionId").value(scanSessionId))
+				.andExpect(jsonPath("$.payerAccountId").value("tester"))
+				.andExpect(jsonPath("$.merchantAccountId").value("lisi"))
+				.andExpect(jsonPath("$.merchantDisplayName").value("Li Si"))
+				.andExpect(jsonPath("$.note").value("Team lunch"));
 
 		mockMvc.perform(post("/api/v1/payments/scan-sessions/resolve")
 						.header("Authorization", bearer(accessToken))
