@@ -50,7 +50,7 @@ After the baseline is stable, Cortex expands into the cloud brain for smart-wear
 - media metadata indexing and delivery status tracking
 
 ### 3.4 Payment and Risk Orchestration
-- scan-pay task creation and merchant session validation
+- wallet QR task creation and wallet session validation
 - transfer and payment workflow orchestration
 - risk control, antifraud policy checks, and audit timeline
 - integration boundary for signed transaction tokens from Retina-backed paths
@@ -72,7 +72,7 @@ Primary target: reliable WeChat-like core messaging and payment workflows.
 - **API layer**: Spring Boot HTTP/WebSocket APIs for auth, profile, upload, payment, and signaling
 - **Message domain**: chat session, message envelope, receipt, recall, unread cursor
 - **Sync domain**: timeline allocator, diff sync, reconnect reconciliation
-- **Payment domain**: QR payment session, transfer orchestration, transaction state machine
+- **Payment domain**: wallet summary, QR transfer session, transfer orchestration, receipt state machine
 - **Infra layer**: Redis, MySQL, Kafka, object storage
 
 ### Stage 1 data flow
@@ -91,7 +91,7 @@ Primary target: convert first-person audio/video and sensor-confirmed behavior i
 - **Multimodal ingress**: receive pre-filtered FPV audio/video chunks from Lens
 - **Intent orchestration**: model prompting, function calling, and typed action validation
 - **Wearable policy engine**: decide what actions are allowed hands-free
-- **Action dispatch layer**: route validated actions into IM, call, scan-pay, or alert workflows
+- **Action dispatch layer**: route validated actions into IM, call, wallet pay / collect, or alert workflows
 - **Audit intelligence layer**: persist model decisions, confidence, evidence pointers, and operator-review traces
 
 ### Stage 2 constraints
@@ -107,7 +107,7 @@ Primary target: convert first-person audio/video and sensor-confirmed behavior i
 - `sync` — timeline IDs, diff sync, offline recovery
 - `media` — upload sessions, asset descriptors, metadata
 - `rtc` — call session metadata, signaling, ICE/SDP exchange state
-- `payment` — merchant scan, transfer, transaction orchestration, risk gate
+- `payment` — wallet summary, QR transfer, receipt orchestration, risk gate
 - `agent` — multimodal ingest, intent parsing, function routing, safety validation
 - `audit` — immutable action and risk history
 - `integration` — adapters for Lens, Retina, Redis, Kafka, storage, model providers
@@ -120,7 +120,7 @@ Primary target: convert first-person audio/video and sensor-confirmed behavior i
 - message send / receive ack / diff pull
 - upload session creation for media payloads
 - WebRTC signaling exchange
-- payment initiation and transaction status polling
+- wallet summary, transfer initiation, receipt lookup, and history sync
 - wearable intent upload in Stage 2
 
 ### 6.2 Cortex -> Retina
@@ -169,7 +169,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 - **Phase 6 primary**: multimodal intent orchestration and function routing
 
 ### Pair D — Phase 7 / Phase 8
-- **Phase 7 primary**: baseline QR pay / transfer orchestration and transaction state machine
+- **Phase 7 primary**: baseline wallet QR pay / collect / transfer orchestration and receipt state machine
 - **Phase 8 support**: consume trusted confirmation and signing artifacts from Lens + Retina for zero-trust visual pay
 
 ## 9. Stage 1 Milestones for This Repo
@@ -178,7 +178,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 2. implement conversation/message/timeline model and reconnect diff sync
 3. add asset upload session APIs for image, voice, and video messages
 4. ship signaling APIs for 1v1 audio/video calls
-5. ship QR pay and transfer orchestration APIs with audit trail
+5. ship wallet QR pay / collect and transfer orchestration APIs with audit trail
 
 ## 10. Stage 2 Milestones for This Repo
 

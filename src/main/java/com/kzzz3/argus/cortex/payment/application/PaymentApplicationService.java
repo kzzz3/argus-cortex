@@ -3,13 +3,17 @@ package com.kzzz3.argus.cortex.payment.application;
 import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
-import com.kzzz3.argus.cortex.payment.domain.PaymentMerchantNotFoundException;
+import com.kzzz3.argus.cortex.payment.domain.PaymentRecipientNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecord;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecordNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecordStore;
 import com.kzzz3.argus.cortex.payment.domain.PaymentScanSession;
 import com.kzzz3.argus.cortex.payment.domain.PaymentScanSessionNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentScanSessionStore;
+import com.kzzz3.argus.cortex.payment.domain.WalletBalanceInsufficientException;
+import com.kzzz3.argus.cortex.payment.domain.WalletRecord;
+import com.kzzz3.argus.cortex.payment.domain.WalletStore;
+import com.kzzz3.argus.cortex.payment.web.WalletSummaryResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -29,40 +33,53 @@ public class PaymentApplicationService {
 	private static final String SUPPORTED_SCHEME = "argus";
 	private static final String SUPPORTED_HOST = "pay";
 	private static final String DEFAULT_CURRENCY = "CNY";
+	private static final BigDecimal DEFAULT_INITIAL_BALANCE = new BigDecimal("1000.00");
 
 	private final AuthenticatedAccountResolver authenticatedAccountResolver;
 	private final AccountStore accountStore;
 	private final PaymentScanSessionStore paymentScanSessionStore;
 	private final PaymentRecordStore paymentRecordStore;
+	private final WalletStore walletStore;
 
 	public PaymentApplicationService(
 			AuthenticatedAccountResolver authenticatedAccountResolver,
 			AccountStore accountStore,
 			PaymentScanSessionStore paymentScanSessionStore,
-			PaymentRecordStore paymentRecordStore
+			PaymentRecordStore paymentRecordStore,
+			WalletStore walletStore
 	) {
 		this.authenticatedAccountResolver = authenticatedAccountResolver;
 		this.accountStore = accountStore;
 		this.paymentScanSessionStore = paymentScanSessionStore;
 		this.paymentRecordStore = paymentRecordStore;
+		this.walletStore = walletStore;
+	}
+
+	@Transactional
+	public WalletSummaryResponse getWalletSummary(String accessToken) {
+		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+		WalletRecord walletRecord = ensureWallet(account);
+		return WalletSummaryResponse.from(account, walletRecord);
 	}
 
 	@Transactional
 	public PaymentScanSession resolveScan(String accessToken, ResolvePaymentScanCommand command) {
 		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+		ensureWallet(payer);
 		ParsedPaymentQr parsedPaymentQr = parseScanPayload(command.scanPayload());
-		AccountRecord merchant = accountStore.findByAccountId(parsedPaymentQr.merchantAccountId())
-				.orElseThrow(() -> new PaymentMerchantNotFoundException(parsedPaymentQr.merchantAccountId()));
+		AccountRecord recipient = accountStore.findByAccountId(parsedPaymentQr.recipientAccountId())
+				.orElseThrow(() -> new PaymentRecipientNotFoundException(parsedPaymentQr.recipientAccountId()));
+		ensureWallet(recipient);
 
-		if (payer.accountId().equals(merchant.accountId())) {
-			throw new IllegalArgumentException("You cannot pay your own merchant code.");
+		if (payer.accountId().equals(recipient.accountId())) {
+			throw new IllegalArgumentException("You cannot pay your own collection code.");
 		}
 
 		PaymentScanSession session = new PaymentScanSession(
 				"payscan-" + UUID.randomUUID(),
 				payer.accountId(),
-				merchant.accountId(),
-				merchant.displayName(),
+				recipient.accountId(),
+				recipient.displayName(),
 				DEFAULT_CURRENCY,
 				parsedPaymentQr.amount(),
 				parsedPaymentQr.amount() == null,
@@ -75,6 +92,7 @@ public class PaymentApplicationService {
 	@Transactional
 	public PaymentRecord confirmPayment(String accessToken, String sessionId, ConfirmPaymentCommand command) {
 		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+		ensureWallet(payer);
 		PaymentScanSession session = paymentScanSessionStore.findBySessionId(sessionId)
 				.orElseThrow(() -> new PaymentScanSessionNotFoundException(sessionId));
 
@@ -87,17 +105,24 @@ public class PaymentApplicationService {
 			return existingRecord.get();
 		}
 
-		AccountRecord merchant = accountStore.findByAccountId(session.merchantAccountId())
-				.orElseThrow(() -> new PaymentMerchantNotFoundException(session.merchantAccountId()));
+		AccountRecord recipient = accountStore.findByAccountId(session.recipientAccountId())
+				.orElseThrow(() -> new PaymentRecipientNotFoundException(session.recipientAccountId()));
+		ensureWallet(recipient);
 		BigDecimal amount = resolvePaymentAmount(session, command.amount());
 		String note = resolvePaymentNote(session, command.note());
+		WalletRecord debitedPayerWallet = walletStore.debit(payer.accountId(), amount)
+				.orElseThrow(() -> new WalletBalanceInsufficientException(payer.accountId()));
+		WalletRecord creditedRecipientWallet = walletStore.credit(recipient.accountId(), amount);
 
 		PaymentRecord paymentRecord = new PaymentRecord(
 				"payment-" + UUID.randomUUID(),
 				session.sessionId(),
 				payer.accountId(),
-				merchant.accountId(),
-				session.merchantDisplayName(),
+				payer.displayName(),
+				debitedPayerWallet.balance(),
+				recipient.accountId(),
+				session.recipientDisplayName(),
+				creditedRecipientWallet.balance(),
 				amount,
 				session.currency(),
 				note,
@@ -108,13 +133,15 @@ public class PaymentApplicationService {
 	}
 
 	public List<PaymentRecord> listPayments(String accessToken) {
-		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
-		return paymentRecordStore.listByPayerAccountId(payer.accountId());
+		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+		ensureWallet(account);
+		return paymentRecordStore.listByParticipantAccountId(account.accountId());
 	}
 
 	public PaymentRecord getPaymentReceipt(String accessToken, String paymentId) {
-		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
-		return paymentRecordStore.findByPaymentIdAndPayerAccountId(paymentId, payer.accountId())
+		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+		ensureWallet(account);
+		return paymentRecordStore.findByPaymentIdAndParticipantAccountId(paymentId, account.accountId())
 				.orElseThrow(() -> new PaymentRecordNotFoundException(paymentId));
 	}
 
@@ -135,9 +162,9 @@ public class PaymentApplicationService {
 		}
 
 		Map<String, String> query = parseQuery(uri.getRawQuery());
-		String merchantAccountId = query.getOrDefault("merchantAccountId", "").trim();
-		if (merchantAccountId.isBlank()) {
-			throw new IllegalArgumentException("Payment QR code is missing merchantAccountId.");
+		String recipientAccountId = query.getOrDefault("recipientAccountId", "").trim();
+		if (recipientAccountId.isBlank()) {
+			throw new IllegalArgumentException("Payment QR code is missing recipientAccountId.");
 		}
 
 		BigDecimal amount = null;
@@ -147,16 +174,16 @@ public class PaymentApplicationService {
 		}
 
 		String note = query.getOrDefault("note", "").trim();
-		return new ParsedPaymentQr(merchantAccountId, amount, note);
+		return new ParsedPaymentQr(recipientAccountId, amount, note);
 	}
 
 	private BigDecimal resolvePaymentAmount(PaymentScanSession session, BigDecimal requestedAmount) {
-		if (session.suggestedAmount() != null) {
+		if (session.requestedAmount() != null) {
 			if (requestedAmount == null) {
-				return session.suggestedAmount();
+				return session.requestedAmount();
 			}
 			BigDecimal normalizedRequested = normalizeAmount(requestedAmount);
-			if (normalizedRequested.compareTo(session.suggestedAmount()) != 0) {
+			if (normalizedRequested.compareTo(session.requestedAmount()) != 0) {
 				throw new IllegalArgumentException("This QR code has a fixed amount and cannot be edited.");
 			}
 			return normalizedRequested;
@@ -170,8 +197,18 @@ public class PaymentApplicationService {
 	}
 
 	private String resolvePaymentNote(PaymentScanSession session, String requestedNote) {
-		String resolved = requestedNote == null || requestedNote.isBlank() ? session.suggestedNote() : requestedNote.trim();
+		String resolved = requestedNote == null || requestedNote.isBlank() ? session.requestedNote() : requestedNote.trim();
 		return resolved.length() > 255 ? resolved.substring(0, 255) : resolved;
+	}
+
+	private WalletRecord ensureWallet(AccountRecord accountRecord) {
+		return walletStore.findByAccountId(accountRecord.accountId())
+				.orElseGet(() -> walletStore.save(new WalletRecord(
+						accountRecord.accountId(),
+						DEFAULT_CURRENCY,
+						DEFAULT_INITIAL_BALANCE,
+						LocalDateTime.now()
+				)));
 	}
 
 	private BigDecimal normalizeAmount(String rawAmount) {
@@ -207,6 +244,6 @@ public class PaymentApplicationService {
 		return result;
 	}
 
-	private record ParsedPaymentQr(String merchantAccountId, BigDecimal amount, String note) {
+	private record ParsedPaymentQr(String recipientAccountId, BigDecimal amount, String note) {
 	}
 }

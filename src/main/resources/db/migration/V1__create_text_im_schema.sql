@@ -5,6 +5,13 @@ CREATE TABLE IF NOT EXISTS account (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS wallet_account (
+    account_id VARCHAR(64) PRIMARY KEY,
+    currency VARCHAR(16) NOT NULL,
+    balance DECIMAL(12, 2) NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS auth_session (
     access_token VARCHAR(128) PRIMARY KEY,
     account_id VARCHAR(64) NOT NULL,
@@ -80,12 +87,12 @@ CREATE TABLE IF NOT EXISTS media_attachment (
 CREATE TABLE IF NOT EXISTS payment_scan_session (
     session_id VARCHAR(128) PRIMARY KEY,
     payer_account_id VARCHAR(64) NOT NULL,
-    merchant_account_id VARCHAR(64) NOT NULL,
-    merchant_display_name VARCHAR(128) NOT NULL,
+    recipient_account_id VARCHAR(64) NOT NULL,
+    recipient_display_name VARCHAR(128) NOT NULL,
     currency VARCHAR(16) NOT NULL,
-    suggested_amount DECIMAL(12, 2),
+    requested_amount DECIMAL(12, 2),
     amount_editable BOOLEAN NOT NULL,
-    suggested_note VARCHAR(255) NOT NULL,
+    requested_note VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -93,8 +100,11 @@ CREATE TABLE IF NOT EXISTS payment_record (
     payment_id VARCHAR(128) PRIMARY KEY,
     session_id VARCHAR(128) NOT NULL,
     payer_account_id VARCHAR(64) NOT NULL,
-    merchant_account_id VARCHAR(64) NOT NULL,
-    merchant_display_name VARCHAR(128) NOT NULL,
+    payer_display_name VARCHAR(128) NOT NULL,
+    payer_balance_after DECIMAL(12, 2) NOT NULL,
+    recipient_account_id VARCHAR(64) NOT NULL,
+    recipient_display_name VARCHAR(128) NOT NULL,
+    recipient_balance_after DECIMAL(12, 2) NOT NULL,
     amount DECIMAL(12, 2) NOT NULL,
     currency VARCHAR(16) NOT NULL,
     note VARCHAR(255) NOT NULL,
