@@ -24,6 +24,13 @@ public class PaymentController {
 		this.paymentApplicationService = paymentApplicationService;
 	}
 
+	@GetMapping("/wallet")
+	public WalletSummaryResponse getWalletSummary(
+			@RequestHeader("Authorization") String authorizationHeader
+	) {
+		return paymentApplicationService.getWalletSummary(BearerTokenExtractor.extract(authorizationHeader));
+	}
+
 	@GetMapping
 	public List<PaymentHistoryItemResponse> listPayments(
 			@RequestHeader("Authorization") String authorizationHeader
