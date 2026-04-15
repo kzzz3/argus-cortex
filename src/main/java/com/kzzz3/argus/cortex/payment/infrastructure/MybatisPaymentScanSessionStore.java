@@ -38,12 +38,12 @@ public class MybatisPaymentScanSessionStore implements PaymentScanSessionStore {
 		PaymentScanSessionEntity entity = new PaymentScanSessionEntity();
 		entity.setSessionId(session.sessionId());
 		entity.setPayerAccountId(session.payerAccountId());
-		entity.setMerchantAccountId(session.merchantAccountId());
-		entity.setMerchantDisplayName(session.merchantDisplayName());
+		entity.setRecipientAccountId(session.recipientAccountId());
+		entity.setRecipientDisplayName(session.recipientDisplayName());
 		entity.setCurrency(session.currency());
-		entity.setSuggestedAmount(session.suggestedAmount());
+		entity.setRequestedAmount(session.requestedAmount());
 		entity.setAmountEditable(session.amountEditable());
-		entity.setSuggestedNote(session.suggestedNote());
+		entity.setRequestedNote(session.requestedNote());
 		entity.setCreatedAt(session.createdAt());
 		return entity;
 	}
@@ -52,12 +52,12 @@ public class MybatisPaymentScanSessionStore implements PaymentScanSessionStore {
 		return new PaymentScanSession(
 				entity.getSessionId(),
 				entity.getPayerAccountId(),
-				entity.getMerchantAccountId(),
-				entity.getMerchantDisplayName(),
+				entity.getRecipientAccountId(),
+				entity.getRecipientDisplayName(),
 				entity.getCurrency(),
-				entity.getSuggestedAmount(),
+				entity.getRequestedAmount(),
 				Boolean.TRUE.equals(entity.getAmountEditable()),
-				entity.getSuggestedNote(),
+				entity.getRequestedNote(),
 				entity.getCreatedAt()
 		);
 	}

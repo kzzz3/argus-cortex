@@ -7,12 +7,12 @@ import org.jspecify.annotations.Nullable;
 public record PaymentScanSession(
 		String sessionId,
 		String payerAccountId,
-		String merchantAccountId,
-		String merchantDisplayName,
+		String recipientAccountId,
+		String recipientDisplayName,
 		String currency,
-		@Nullable BigDecimal suggestedAmount,
+		@Nullable BigDecimal requestedAmount,
 		boolean amountEditable,
-		String suggestedNote,
+		String requestedNote,
 		LocalDateTime createdAt
 ) {
 }

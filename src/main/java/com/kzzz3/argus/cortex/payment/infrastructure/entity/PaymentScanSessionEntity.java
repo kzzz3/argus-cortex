@@ -11,30 +11,30 @@ public class PaymentScanSessionEntity {
 	@TableId
 	private String sessionId;
 	private String payerAccountId;
-	private String merchantAccountId;
-	private String merchantDisplayName;
+	private String recipientAccountId;
+	private String recipientDisplayName;
 	private String currency;
-	private BigDecimal suggestedAmount;
+	private BigDecimal requestedAmount;
 	private Boolean amountEditable;
-	private String suggestedNote;
+	private String requestedNote;
 	private LocalDateTime createdAt;
 
 	public String getSessionId() { return sessionId; }
 	public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 	public String getPayerAccountId() { return payerAccountId; }
 	public void setPayerAccountId(String payerAccountId) { this.payerAccountId = payerAccountId; }
-	public String getMerchantAccountId() { return merchantAccountId; }
-	public void setMerchantAccountId(String merchantAccountId) { this.merchantAccountId = merchantAccountId; }
-	public String getMerchantDisplayName() { return merchantDisplayName; }
-	public void setMerchantDisplayName(String merchantDisplayName) { this.merchantDisplayName = merchantDisplayName; }
+	public String getRecipientAccountId() { return recipientAccountId; }
+	public void setRecipientAccountId(String recipientAccountId) { this.recipientAccountId = recipientAccountId; }
+	public String getRecipientDisplayName() { return recipientDisplayName; }
+	public void setRecipientDisplayName(String recipientDisplayName) { this.recipientDisplayName = recipientDisplayName; }
 	public String getCurrency() { return currency; }
 	public void setCurrency(String currency) { this.currency = currency; }
-	public BigDecimal getSuggestedAmount() { return suggestedAmount; }
-	public void setSuggestedAmount(BigDecimal suggestedAmount) { this.suggestedAmount = suggestedAmount; }
+	public BigDecimal getRequestedAmount() { return requestedAmount; }
+	public void setRequestedAmount(BigDecimal requestedAmount) { this.requestedAmount = requestedAmount; }
 	public Boolean getAmountEditable() { return amountEditable; }
 	public void setAmountEditable(Boolean amountEditable) { this.amountEditable = amountEditable; }
-	public String getSuggestedNote() { return suggestedNote; }
-	public void setSuggestedNote(String suggestedNote) { this.suggestedNote = suggestedNote; }
+	public String getRequestedNote() { return requestedNote; }
+	public void setRequestedNote(String requestedNote) { this.requestedNote = requestedNote; }
 	public LocalDateTime getCreatedAt() { return createdAt; }
 	public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
