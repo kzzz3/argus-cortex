@@ -43,8 +43,11 @@ public class MybatisPaymentRecordStore implements PaymentRecordStore {
 		entity.setPaymentId(paymentRecord.paymentId());
 		entity.setSessionId(paymentRecord.sessionId());
 		entity.setPayerAccountId(paymentRecord.payerAccountId());
-		entity.setMerchantAccountId(paymentRecord.merchantAccountId());
-		entity.setMerchantDisplayName(paymentRecord.merchantDisplayName());
+		entity.setPayerDisplayName(paymentRecord.payerDisplayName());
+		entity.setPayerBalanceAfter(paymentRecord.payerBalanceAfter());
+		entity.setRecipientAccountId(paymentRecord.recipientAccountId());
+		entity.setRecipientDisplayName(paymentRecord.recipientDisplayName());
+		entity.setRecipientBalanceAfter(paymentRecord.recipientBalanceAfter());
 		entity.setAmount(paymentRecord.amount());
 		entity.setCurrency(paymentRecord.currency());
 		entity.setNote(paymentRecord.note());
@@ -58,8 +61,11 @@ public class MybatisPaymentRecordStore implements PaymentRecordStore {
 				entity.getPaymentId(),
 				entity.getSessionId(),
 				entity.getPayerAccountId(),
-				entity.getMerchantAccountId(),
-				entity.getMerchantDisplayName(),
+				entity.getPayerDisplayName(),
+				entity.getPayerBalanceAfter(),
+				entity.getRecipientAccountId(),
+				entity.getRecipientDisplayName(),
+				entity.getRecipientBalanceAfter(),
 				entity.getAmount(),
 				entity.getCurrency(),
 				entity.getNote(),
@@ -69,9 +75,12 @@ public class MybatisPaymentRecordStore implements PaymentRecordStore {
 	}
 
 	@Override
-	public List<PaymentRecord> listByPayerAccountId(String payerAccountId) {
+	public List<PaymentRecord> listByParticipantAccountId(String accountId) {
 		return paymentRecordMapper.selectList(new LambdaQueryWrapper<PaymentRecordEntity>()
-				.eq(PaymentRecordEntity::getPayerAccountId, payerAccountId)
+				.and(wrapper -> wrapper
+						.eq(PaymentRecordEntity::getPayerAccountId, accountId)
+						.or()
+						.eq(PaymentRecordEntity::getRecipientAccountId, accountId))
 				.orderByDesc(PaymentRecordEntity::getCreatedAt))
 				.stream()
 				.map(this::toRecord)
@@ -79,13 +88,16 @@ public class MybatisPaymentRecordStore implements PaymentRecordStore {
 	}
 
 	@Override
-	public Optional<PaymentRecord> findByPaymentIdAndPayerAccountId(String paymentId, String payerAccountId) {
-		if (paymentId == null || paymentId.isBlank() || payerAccountId == null || payerAccountId.isBlank()) {
+	public Optional<PaymentRecord> findByPaymentIdAndParticipantAccountId(String paymentId, String accountId) {
+		if (paymentId == null || paymentId.isBlank() || accountId == null || accountId.isBlank()) {
 			return Optional.empty();
 		}
 		PaymentRecordEntity entity = paymentRecordMapper.selectOne(new LambdaQueryWrapper<PaymentRecordEntity>()
 				.eq(PaymentRecordEntity::getPaymentId, paymentId)
-				.eq(PaymentRecordEntity::getPayerAccountId, payerAccountId));
+				.and(wrapper -> wrapper
+						.eq(PaymentRecordEntity::getPayerAccountId, accountId)
+						.or()
+						.eq(PaymentRecordEntity::getRecipientAccountId, accountId)));
 		return Optional.ofNullable(entity).map(this::toRecord);
 	}
 }

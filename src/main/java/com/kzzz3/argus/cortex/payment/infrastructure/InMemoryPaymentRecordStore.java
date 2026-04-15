@@ -33,17 +33,17 @@ public class InMemoryPaymentRecordStore implements PaymentRecordStore {
 	}
 
 	@Override
-	public List<PaymentRecord> listByPayerAccountId(String payerAccountId) {
+	public List<PaymentRecord> listByParticipantAccountId(String accountId) {
 		return recordsByPaymentId.values().stream()
-				.filter(record -> record.payerAccountId().equals(payerAccountId))
+				.filter(record -> record.payerAccountId().equals(accountId) || record.recipientAccountId().equals(accountId))
 				.sorted(Comparator.comparing(PaymentRecord::createdAt).reversed())
 				.toList();
 	}
 
 	@Override
-	public Optional<PaymentRecord> findByPaymentIdAndPayerAccountId(String paymentId, String payerAccountId) {
+	public Optional<PaymentRecord> findByPaymentIdAndParticipantAccountId(String paymentId, String accountId) {
 		PaymentRecord record = recordsByPaymentId.get(paymentId);
-		if (record == null || !record.payerAccountId().equals(payerAccountId)) {
+		if (record == null || (!record.payerAccountId().equals(accountId) && !record.recipientAccountId().equals(accountId))) {
 			return Optional.empty();
 		}
 		return Optional.of(record);

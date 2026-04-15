@@ -9,7 +9,7 @@ public interface PaymentRecordStore {
 
 	Optional<PaymentRecord> findBySessionId(String sessionId);
 
-	List<PaymentRecord> listByPayerAccountId(String payerAccountId);
+	List<PaymentRecord> listByParticipantAccountId(String accountId);
 
-	Optional<PaymentRecord> findByPaymentIdAndPayerAccountId(String paymentId, String payerAccountId);
+	Optional<PaymentRecord> findByPaymentIdAndParticipantAccountId(String paymentId, String accountId);
 }

@@ -12,8 +12,11 @@ public class PaymentRecordEntity {
 	private String paymentId;
 	private String sessionId;
 	private String payerAccountId;
-	private String merchantAccountId;
-	private String merchantDisplayName;
+	private String payerDisplayName;
+	private BigDecimal payerBalanceAfter;
+	private String recipientAccountId;
+	private String recipientDisplayName;
+	private BigDecimal recipientBalanceAfter;
 	private BigDecimal amount;
 	private String currency;
 	private String note;
@@ -26,10 +29,16 @@ public class PaymentRecordEntity {
 	public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 	public String getPayerAccountId() { return payerAccountId; }
 	public void setPayerAccountId(String payerAccountId) { this.payerAccountId = payerAccountId; }
-	public String getMerchantAccountId() { return merchantAccountId; }
-	public void setMerchantAccountId(String merchantAccountId) { this.merchantAccountId = merchantAccountId; }
-	public String getMerchantDisplayName() { return merchantDisplayName; }
-	public void setMerchantDisplayName(String merchantDisplayName) { this.merchantDisplayName = merchantDisplayName; }
+	public String getPayerDisplayName() { return payerDisplayName; }
+	public void setPayerDisplayName(String payerDisplayName) { this.payerDisplayName = payerDisplayName; }
+	public BigDecimal getPayerBalanceAfter() { return payerBalanceAfter; }
+	public void setPayerBalanceAfter(BigDecimal payerBalanceAfter) { this.payerBalanceAfter = payerBalanceAfter; }
+	public String getRecipientAccountId() { return recipientAccountId; }
+	public void setRecipientAccountId(String recipientAccountId) { this.recipientAccountId = recipientAccountId; }
+	public String getRecipientDisplayName() { return recipientDisplayName; }
+	public void setRecipientDisplayName(String recipientDisplayName) { this.recipientDisplayName = recipientDisplayName; }
+	public BigDecimal getRecipientBalanceAfter() { return recipientBalanceAfter; }
+	public void setRecipientBalanceAfter(BigDecimal recipientBalanceAfter) { this.recipientBalanceAfter = recipientBalanceAfter; }
 	public BigDecimal getAmount() { return amount; }
 	public void setAmount(BigDecimal amount) { this.amount = amount; }
 	public String getCurrency() { return currency; }
