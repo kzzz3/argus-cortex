@@ -2,7 +2,6 @@ package com.kzzz3.argus.cortex.conversation.application;
 
 import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
-import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationDetail;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessage;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationMessageAttachment;
@@ -25,47 +24,43 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConversationApplicationService {
 
     private static final int DEFAULT_RECENT_WINDOW_DAYS = 7;
-    private static final int DEFAULT_MESSAGE_LIMIT = 50;
+	private static final int DEFAULT_MESSAGE_LIMIT = 50;
 
 	private final AuthenticatedAccountResolver authenticatedAccountResolver;
-	private final AccountStore accountStore;
     private final ConversationStore conversationStore;
     private final ConversationRealtimePublisher conversationRealtimePublisher;
     private final MediaAttachmentStore mediaAttachmentStore;
 
 	public ConversationApplicationService(
 			AuthenticatedAccountResolver authenticatedAccountResolver,
-			AccountStore accountStore,
 			ConversationStore conversationStore,
 			ConversationRealtimePublisher conversationRealtimePublisher,
 			MediaAttachmentStore mediaAttachmentStore
 	) {
 		this.authenticatedAccountResolver = authenticatedAccountResolver;
-		this.accountStore = accountStore;
         this.conversationStore = conversationStore;
         this.conversationRealtimePublisher = conversationRealtimePublisher;
         this.mediaAttachmentStore = mediaAttachmentStore;
     }
 
-	public List<ConversationSummary> listConversations(String accessToken, int recentWindowDays) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+	public List<ConversationSummary> listConversations(int recentWindowDays) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
         return conversationStore.listConversations(accountRecord, normalizedWindowDays);
     }
 
-	public ConversationDetail getConversationDetail(String accessToken, String conversationId) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+	public ConversationDetail getConversationDetail(String conversationId) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         return conversationStore.getConversationDetail(accountRecord, conversationId);
     }
 
-    public ConversationMessagePage listMessages(
-            String accessToken,
-            String conversationId,
-            int recentWindowDays,
-            int limit,
-            String sinceCursor
+	public ConversationMessagePage listMessages(
+			String conversationId,
+			int recentWindowDays,
+			int limit,
+			String sinceCursor
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         int normalizedWindowDays = normalizeRecentWindowDays(recentWindowDays);
         int normalizedLimit = normalizeMessageLimit(limit);
         return conversationStore.listMessages(accountRecord, conversationId, normalizedWindowDays, normalizedLimit, sinceCursor);
@@ -73,11 +68,10 @@ public class ConversationApplicationService {
 
 	@Transactional
 	public ConversationMessage sendMessage(
-			String accessToken,
 			String conversationId,
 			SendMessageCommand request
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
 		ConversationMessageAttachment attachment = resolveAttachment(accountRecord, conversationId, request.attachmentId());
         String normalizedBody = normalizeMessageBody(request.body(), attachment);
         ConversationMessage message = conversationStore.sendMessage(
@@ -93,12 +87,11 @@ public class ConversationApplicationService {
 
 	@Transactional
 	public ConversationMessage applyReceipt(
-			String accessToken,
 			String conversationId,
 			String messageId,
 			ApplyMessageReceiptCommand request
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         ConversationMessage message = conversationStore.applyReceipt(accountRecord, conversationId, messageId, request.receiptType().trim());
         publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_STATUS_UPDATED, message);
         return message;
@@ -106,11 +99,10 @@ public class ConversationApplicationService {
 
 	@Transactional
 	public ConversationMessage recallMessage(
-			String accessToken,
 			String conversationId,
 			String messageId
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         ConversationMessage message = conversationStore.recallMessage(accountRecord, conversationId, messageId);
         publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_RECALLED, message);
         return message;
@@ -118,38 +110,12 @@ public class ConversationApplicationService {
 
 	@Transactional
 	public ConversationSummary markConversationRead(
-			String accessToken,
 			String conversationId
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         ConversationSummary summary = conversationStore.markConversationRead(accountRecord, conversationId);
         publishRealtimeEvent(conversationId, ConversationRealtimeEventType.CONVERSATION_READ, null);
         return summary;
-    }
-
-	@Transactional
-	public ConversationSummary createConversation(
-			String accessToken,
-			CreateConversationCommand request
-	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
-        ConversationSummary summary = conversationStore.createConversation(accountRecord, request.type().trim(), request.title().trim());
-        publishRealtimeEvent(summary.id(), ConversationRealtimeEventType.CONVERSATION_CREATED, null);
-        return summary;
-    }
-
-	@Transactional
-	public ConversationDetail addMember(
-			String accessToken,
-			String conversationId,
-			AddConversationMemberCommand request
-	) {
-		AccountRecord owner = authenticatedAccountResolver.resolve(accessToken);
-		AccountRecord member = accountStore.findByAccountId(request.memberAccountId().trim())
-				.orElseThrow(() -> new IllegalArgumentException("Conversation member account not found."));
-        ConversationDetail detail = conversationStore.addMember(owner, conversationId, member);
-        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.CONVERSATION_UPDATED, null);
-        return detail;
     }
 
     private void publishRealtimeEvent(String conversationId, ConversationRealtimeEventType eventType, ConversationMessage message) {

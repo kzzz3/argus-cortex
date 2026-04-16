@@ -14,7 +14,7 @@ The overall product is developed in two stages:
 Deliver the standard communication and payment backbone first:
 
 - account and device login
-- single chat and group chat
+- direct chat and friend-request workflow
 - text, voice, image, and video message delivery
 - call signaling and session coordination
 - message sync and offline recovery
@@ -102,7 +102,7 @@ Primary target: convert first-person audio/video and sensor-confirmed behavior i
 ## 5. Recommended Domain Map
 
 - `identity` — account, token, device enrollment, trust
-- `social` — contacts, groups, presence, relation graph
+- `social` — contacts, friend requests, presence, relation graph
 - `im` — sessions, messages, receipts, unread state, recall
 - `sync` — timeline IDs, diff sync, offline recovery
 - `media` — upload sessions, asset descriptors, metadata
@@ -234,7 +234,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 - [x] add sync cursor / recent-window continuation semantics instead of static list-only responses
 - [ ] add server-driven delivery receipt and read-state sync
 - [ ] add idempotent send semantics and duplicate suppression for message retries
-- [ ] add server-managed group membership and conversation ownership rules instead of purely synthetic thread generation
+- [ ] finalize friend-request workflow and direct-chat ownership rules for Stage 1
 
 ### 13.2 Media and realtime follow-up
 - [x] SSE event streams now emit stable event ids, heartbeat frames, and reconnect resume support via Last-Event-ID

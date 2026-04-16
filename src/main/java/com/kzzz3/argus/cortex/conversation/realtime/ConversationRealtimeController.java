@@ -2,7 +2,7 @@ package com.kzzz3.argus.cortex.conversation.realtime;
 
 import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
-import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,12 +21,11 @@ public class ConversationRealtimeController {
 		this.realtimePublisher = realtimePublisher;
 	}
 
-    @GetMapping("/events")
+    @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamEvents(
-            @RequestHeader("Authorization") String authorizationHeader,
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId
     ) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(BearerTokenExtractor.extract(authorizationHeader));
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
         realtimePublisher.register(accountRecord.accountId(), emitter, lastEventId);
         emitter.onCompletion(() -> realtimePublisher.unregister(accountRecord.accountId(), emitter));
@@ -36,7 +35,11 @@ public class ConversationRealtimeController {
         });
         emitter.onError(error -> {
             realtimePublisher.unregister(accountRecord.accountId(), emitter);
-            emitter.completeWithError(error);
+            try {
+                emitter.complete();
+            } catch (IllegalStateException ignored) {
+                // Response already closed by container/client disconnect.
+            }
         });
         return emitter;
     }

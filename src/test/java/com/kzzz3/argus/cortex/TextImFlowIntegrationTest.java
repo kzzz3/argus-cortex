@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -31,16 +32,43 @@ class TextImFlowIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+				.apply(SecurityMockMvcConfigurers.springSecurity())
+				.build();
 	}
 
 	@Test
 	void malformedAuthorizationHeaderReturnsBadRequest() throws Exception {
 		mockMvc.perform(get("/api/v1/conversations")
 						.header("Authorization", "Token invalid"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.code").value("BAD_REQUEST"))
-				.andExpect(jsonPath("$.message").value("Authorization header must use Bearer token."));
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void refreshEndpointRenewsTokenPair() throws Exception {
+		String accessToken = registerAndReadAccessToken("Refresh User", "refresh-user", "secret123");
+		String refreshToken = registerAndReadRefreshToken("Refresh User 2", "refresh-user-2", "secret123");
+
+		mockMvc.perform(get("/api/v1/auth/session/me")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk());
+
+		MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"refreshToken":"%s"}
+								""".formatted(refreshToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accessToken").isNotEmpty())
+				.andExpect(jsonPath("$.refreshToken").isNotEmpty())
+				.andReturn();
+
+		String renewedAccessToken = objectMapper.readTree(refreshResult.getResponse().getContentAsString()).get("accessToken").asText();
+
+		mockMvc.perform(get("/api/v1/auth/session/me")
+						.header("Authorization", bearer(renewedAccessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accountId").value("refresh-user-2"));
 	}
 
 	@Test
@@ -48,6 +76,11 @@ class TextImFlowIntegrationTest {
 		register("Zhang San", "zhangsan", "secret123");
 		String lisiAccessToken = registerAndReadAccessToken("Li Si", "lisi", "secret123");
 		String accessToken = registerAndReadAccessToken("Argus Tester", "tester", "secret123");
+
+		mockMvc.perform(get("/api/v1/auth/session/me")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accountId").value("tester"));
 
 		mockMvc.perform(get("/api/v1/payments/wallet")
 						.header("Authorization", bearer(accessToken)))
@@ -64,10 +97,45 @@ class TextImFlowIntegrationTest {
 								{"friendAccountId":"lisi"}
 								"""))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.accountId").value("lisi"));
+				.andExpect(jsonPath("$.accountId").value("lisi"))
+				.andExpect(jsonPath("$.direction").value("OUTGOING"))
+				.andExpect(jsonPath("$.status").value("PENDING"));
+
+		MvcResult pendingOutgoingResult = mockMvc.perform(get("/api/v1/friends/requests")
+						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.outgoing", hasSize(1)))
+				.andExpect(jsonPath("$.outgoing[0].accountId").value("lisi"))
+				.andExpect(jsonPath("$.incoming", hasSize(0)))
+				.andReturn();
+
+		String friendRequestId = objectMapper.readTree(pendingOutgoingResult.getResponse().getContentAsString())
+				.get("outgoing")
+				.get(0)
+				.get("requestId")
+				.asText();
+
+		mockMvc.perform(get("/api/v1/friends/requests")
+						.header("Authorization", bearer(lisiAccessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.incoming", hasSize(1)))
+				.andExpect(jsonPath("$.incoming[0].accountId").value("tester"))
+				.andExpect(jsonPath("$.outgoing", hasSize(0)));
+
+		mockMvc.perform(post("/api/v1/friends/requests/{requestId}/accept", friendRequestId)
+						.header("Authorization", bearer(lisiAccessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accountId").value("tester"));
 
 		mockMvc.perform(get("/api/v1/friends")
 						.header("Authorization", bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasSize(1)));
+
+		mockMvc.perform(get("/api/v1/friends")
+						.header("Authorization", bearer(lisiAccessToken)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(1)));
 
@@ -380,44 +448,39 @@ class TextImFlowIntegrationTest {
 						.content("{}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.unreadCount").value(0));
+	}
 
-		MvcResult groupCreateResult = mockMvc.perform(post("/api/v1/conversations")
-						.header("Authorization", bearer(accessToken))
+	@Test
+	void friendRequestsSupportRejectAndIgnore() throws Exception {
+		String incomingOwnerToken = registerAndReadAccessToken("Owner", "owner", "secret123");
+		String rejecterToken = registerAndReadAccessToken("Rejecter", "rejecter", "secret123");
+		String ignorerToken = registerAndReadAccessToken("Ignorer", "ignorer", "secret123");
+
+		String rejectRequestId = sendFriendRequestAndReadRequestId(incomingOwnerToken, "rejecter");
+		String ignoreRequestId = sendFriendRequestAndReadRequestId(incomingOwnerToken, "ignorer");
+
+		mockMvc.perform(post("/api/v1/friends/requests/{requestId}/reject", rejectRequestId)
+						.header("Authorization", bearer(rejecterToken))
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"type":"GROUP","title":"Backend Group"}
-								"""))
+						.content("{}"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.title").value("Backend Group"))
-				.andExpect(jsonPath("$.subtitle").value("Remote group conversation"))
-				.andReturn();
+				.andExpect(jsonPath("$.requestId").value(rejectRequestId))
+				.andExpect(jsonPath("$.status").value("REJECTED"));
 
-		String groupConversationId = objectMapper.readTree(groupCreateResult.getResponse().getContentAsString()).get("id").asText();
-
-		mockMvc.perform(post("/api/v1/conversations/{conversationId}/members", groupConversationId)
-						.header("Authorization", bearer(accessToken))
+		mockMvc.perform(post("/api/v1/friends/requests/{requestId}/ignore", ignoreRequestId)
+						.header("Authorization", bearer(ignorerToken))
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"memberAccountId":"zhangsan"}
-								"""))
+						.content("{}"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.memberCount").value(2));
+				.andExpect(jsonPath("$.requestId").value(ignoreRequestId))
+				.andExpect(jsonPath("$.status").value("IGNORED"));
 
-		mockMvc.perform(post("/api/v1/conversations/{conversationId}/members", groupConversationId)
-						.header("Authorization", bearer(accessToken))
-						.contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{"memberAccountId":"lisi"}
-								"""))
+		mockMvc.perform(get("/api/v1/friends/requests")
+						.header("Authorization", bearer(incomingOwnerToken)))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.memberCount").value(3));
-
-		mockMvc.perform(get("/api/v1/conversations/{conversationId}", groupConversationId)
-						.header("Authorization", bearer(accessToken)))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.title").value("Backend Group"))
-				.andExpect(jsonPath("$.memberCount").value(3))
-				.andExpect(jsonPath("$.memberDisplayNames", hasSize(3)));
+				.andExpect(jsonPath("$.outgoing", hasSize(2)))
+				.andExpect(jsonPath("$.outgoing[?(@.requestId=='%s')].status".formatted(rejectRequestId)).value(org.hamcrest.Matchers.contains("REJECTED")))
+				.andExpect(jsonPath("$.outgoing[?(@.requestId=='%s')].status".formatted(ignoreRequestId)).value(org.hamcrest.Matchers.contains("IGNORED")));
 	}
 
 	@Test
@@ -465,6 +528,31 @@ class TextImFlowIntegrationTest {
 				.andReturn();
 
 		return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
+	}
+
+	private String registerAndReadRefreshToken(String displayName, String accountId, String password) throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"displayName":"%s","account":"%s","password":"%s"}
+								""".formatted(displayName, accountId, password)))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		return objectMapper.readTree(result.getResponse().getContentAsString()).get("refreshToken").asText();
+	}
+
+	private String sendFriendRequestAndReadRequestId(String accessToken, String friendAccountId) throws Exception {
+		MvcResult result = mockMvc.perform(post("/api/v1/friends")
+						.header("Authorization", bearer(accessToken))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"friendAccountId":"%s"}
+								""".formatted(friendAccountId)))
+				.andExpect(status().isOk())
+				.andReturn();
+
+		return objectMapper.readTree(result.getResponse().getContentAsString()).get("requestId").asText();
 	}
 
 	private String findConversationSyncCursor(JsonNode conversationsBody, String conversationId) {

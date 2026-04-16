@@ -138,53 +138,6 @@ public class InMemoryConversationStore implements ConversationStore {
 		return ownerThread.toSummary();
 	}
 
-	@Override
-	public ConversationSummary createConversation(AccountRecord owner, String type, String title) {
-		String normalizedType = type == null ? "GROUP" : type.trim().toUpperCase();
-		String normalizedTitle = title == null || title.isBlank() ? "Untitled Conversation" : title.trim();
-		String conversationId = switch (normalizedType) {
-			case "DIRECT" -> "conv-direct-" + owner.accountId() + "-self";
-			case "GROUP" -> "conv-group-" + UUID.randomUUID();
-			default -> "conv-group-" + UUID.randomUUID();
-		};
-		ConversationThreadState threadState = getOrCreateConversations(owner)
-				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
-						conversationId,
-						normalizedTitle,
-						normalizedType.equals("GROUP") ? "Remote group conversation" : "Remote direct conversation",
-						0,
-						new ArrayList<>(),
-						new ArrayList<>(List.of(owner.displayName()))
-				));
-		return threadState.toSummary();
-	}
-
-	@Override
-	public ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member) {
-		ConversationThreadState ownerThread = requireConversation(owner, conversationId);
-		ownerThread.ensureMember(member.displayName());
-
-		ConversationThreadState memberThread = getOrCreateConversations(member)
-				.computeIfAbsent(conversationId, ignored -> new ConversationThreadState(
-						conversationId,
-						ownerThread.title,
-						ownerThread.subtitle,
-						0,
-						new ArrayList<>(),
-						new ArrayList<>(ownerThread.members)
-				));
-		memberThread.ensureMember(member.displayName());
-
-		for (Map.Entry<String, LinkedHashMap<String, ConversationThreadState>> entry : conversationsByAccount.entrySet()) {
-			ConversationThreadState threadState = entry.getValue().get(conversationId);
-			if (threadState != null) {
-				threadState.ensureMember(member.displayName());
-			}
-		}
-
-		return ownerThread.toDetail(owner.displayName());
-	}
-
 	private ConversationThreadState requireConversation(AccountRecord accountRecord, String conversationId) {
 		ConversationThreadState threadState = getOrCreateConversations(accountRecord).get(conversationId);
 		if (threadState == null) {

@@ -5,6 +5,8 @@ import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import com.kzzz3.argus.cortex.friend.domain.FriendAlreadyExistsException;
+import com.kzzz3.argus.cortex.friend.domain.FriendRequestAlreadyExistsException;
+import com.kzzz3.argus.cortex.friend.domain.FriendRequestNotFoundException;
 import com.kzzz3.argus.cortex.friend.domain.FriendTargetNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecipientNotFoundException;
 import com.kzzz3.argus.cortex.payment.domain.PaymentRecordNotFoundException;
@@ -80,6 +82,18 @@ public class GlobalApiExceptionHandler {
 	public ResponseEntity<ApiErrorResponse> handleFriendTargetNotFound(FriendTargetNotFoundException exception) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(new ApiErrorResponse("FRIEND_TARGET_NOT_FOUND", exception.getMessage()));
+	}
+
+	@ExceptionHandler(FriendRequestAlreadyExistsException.class)
+	public ResponseEntity<ApiErrorResponse> handleFriendRequestAlreadyExists(FriendRequestAlreadyExistsException exception) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(new ApiErrorResponse("FRIEND_REQUEST_ALREADY_EXISTS", exception.getMessage()));
+	}
+
+	@ExceptionHandler(FriendRequestNotFoundException.class)
+	public ResponseEntity<ApiErrorResponse> handleFriendRequestNotFound(FriendRequestNotFoundException exception) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(new ApiErrorResponse("FRIEND_REQUEST_NOT_FOUND", exception.getMessage()));
 	}
 
 	@ExceptionHandler(PaymentRecipientNotFoundException.class)

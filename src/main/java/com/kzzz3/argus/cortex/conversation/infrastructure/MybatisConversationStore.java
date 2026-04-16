@@ -179,56 +179,6 @@ public class MybatisConversationStore implements ConversationStore {
 		return toSummary(ownerThread);
 	}
 
-	@Override
-	public ConversationSummary createConversation(AccountRecord owner, String type, String title) {
-		String normalizedType = type == null ? "GROUP" : type.trim().toUpperCase();
-		String normalizedTitle = title == null || title.isBlank() ? "Untitled Conversation" : title.trim();
-		String conversationId = switch (normalizedType) {
-			case "DIRECT" -> "conv-direct-" + owner.accountId() + "-self";
-			case "GROUP" -> "conv-group-" + UUID.randomUUID();
-			default -> "conv-group-" + UUID.randomUUID();
-		};
-		ConversationThreadEntity existing = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getOwnerAccountId, owner.accountId())
-				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		if (existing != null) {
-			return toSummary(existing);
-		}
-		insertThread(
-				owner.accountId(),
-				conversationId,
-				normalizedTitle,
-				normalizedType.equals("GROUP") ? "Remote group conversation" : "Remote direct conversation",
-				0
-		);
-		ConversationThreadEntity created = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getOwnerAccountId, owner.accountId())
-				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		insertMember(owner.accountId(), conversationId, owner.accountId(), owner.displayName());
-		return toSummary(created);
-	}
-
-	@Override
-	public ConversationDetail addMember(AccountRecord owner, String conversationId, AccountRecord member) {
-		ConversationThreadEntity ownerThread = requireThread(owner.accountId(), conversationId, 7);
-		ensureMember(owner.accountId(), conversationId, member.accountId(), member.displayName());
-
-		List<ConversationThreadEntity> existingThreads = threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		boolean memberHasThread = existingThreads.stream().anyMatch(thread -> thread.getOwnerAccountId().equals(member.accountId()));
-		if (!memberHasThread) {
-			insertThread(member.accountId(), conversationId, ownerThread.getTitle(), ownerThread.getSubtitle(), 0);
-		}
-
-		existingThreads = threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
-				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		for (ConversationThreadEntity thread : existingThreads) {
-			ensureMember(thread.getOwnerAccountId(), conversationId, member.accountId(), member.displayName());
-		}
-		ensureMember(member.accountId(), conversationId, owner.accountId(), owner.displayName());
-		return getConversationDetail(owner, conversationId);
-	}
-
 	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
 		ConversationThreadEntity entity = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
 				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)

@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.conversation.realtime;
 
 import com.kzzz3.argus.cortex.conversation.infrastructure.mapper.ConversationThreadMapper;
 import java.io.IOException;
+import java.util.Locale;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -135,13 +136,57 @@ public class SseConversationRealtimePublisher implements ConversationRealtimePub
                     .name("conversation-event")
                     .data(event));
         } catch (IOException | IllegalStateException ex) {
-            LOGGER.warn("Failed to send SSE event to account {}: {}", accountId, ex.getMessage());
+            if (isClientDisconnect(ex)) {
+                LOGGER.debug("SSE client disconnected for account {}: {}", accountId, buildRootMessage(ex));
+            } else {
+                LOGGER.warn("Failed to send SSE event to account {}: {}", accountId, buildRootMessage(ex));
+            }
             unregister(accountId, emitter);
+            completeEmitter(emitter, ex);
+        }
+    }
+
+    private void completeEmitter(SseEmitter emitter, Exception ex) {
+        try {
+            emitter.completeWithError(ex);
+        } catch (IllegalStateException ignored) {
             try {
-                emitter.completeWithError(ex);
-            } catch (IllegalStateException ignored) {
                 emitter.complete();
+            } catch (IllegalStateException ignoredAgain) {
+                // Emitter already completed or container already closed the response.
             }
         }
+    }
+
+    private boolean isClientDisconnect(Exception ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            String normalizedMessage = message == null ? "" : message.toLowerCase(Locale.ROOT);
+            String className = current.getClass().getName();
+            if (className.contains("ClientAbortException")
+                    || normalizedMessage.contains("broken pipe")
+                    || normalizedMessage.contains("connection reset")
+                    || normalizedMessage.contains("forcibly closed")
+                    || normalizedMessage.contains("an established connection was aborted")
+                    || normalizedMessage.contains("software caused connection abort")
+                    || normalizedMessage.contains("你的主机中的软件中止了一个已建立的连接")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private String buildRootMessage(Throwable throwable) {
+        Throwable current = throwable;
+        String lastMessage = throwable.getMessage();
+        while (current != null) {
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                lastMessage = current.getMessage();
+            }
+            current = current.getCause();
+        }
+        return lastMessage == null || lastMessage.isBlank() ? throwable.getClass().getSimpleName() : lastMessage;
     }
 }

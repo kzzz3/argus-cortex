@@ -2,11 +2,11 @@ package com.kzzz3.argus.cortex.auth.web;
 
 import com.kzzz3.argus.cortex.auth.application.AuthApplicationService;
 import com.kzzz3.argus.cortex.auth.application.LoginCommand;
+import com.kzzz3.argus.cortex.auth.application.RefreshTokenCommand;
 import com.kzzz3.argus.cortex.auth.application.RegisterCommand;
-import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.validation.Valid;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,10 +36,15 @@ public class AuthController {
 		));
 	}
 
+	@PostMapping("/refresh")
+	public AuthSuccessResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+		return AuthSuccessResponse.from(authApplicationService.refresh(new RefreshTokenCommand(request.refreshToken())));
+	}
+
 	@GetMapping("/session/me")
-	public AuthSuccessResponse restoreSession(@RequestHeader("Authorization") String authorizationHeader) {
+	public AuthSuccessResponse restoreSession(JwtAuthenticationToken authentication) {
 		return AuthSuccessResponse.from(
-				authApplicationService.restoreSession(BearerTokenExtractor.extract(authorizationHeader))
+				authApplicationService.restoreSession(authentication.getToken())
 		);
 	}
 }

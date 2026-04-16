@@ -4,6 +4,7 @@ public record AuthResult(
 		String accountId,
 		String displayName,
 		String accessToken,
+		String refreshToken,
 		String message
 ) {
 }

@@ -7,5 +7,13 @@ public interface FriendStore {
 
 	List<FriendRecord> listFriends(AccountRecord owner);
 
-	FriendRecord addFriend(AccountRecord owner, AccountRecord friend);
+	PendingFriendRequests listPendingRequests(AccountRecord owner);
+
+	FriendRequestRecord sendFriendRequest(AccountRecord owner, AccountRecord friend);
+
+	FriendRecord acceptFriendRequest(AccountRecord owner, String requestId);
+
+	FriendRequestRecord rejectFriendRequest(AccountRecord owner, String requestId);
+
+	FriendRequestRecord ignoreFriendRequest(AccountRecord owner, String requestId);
 }

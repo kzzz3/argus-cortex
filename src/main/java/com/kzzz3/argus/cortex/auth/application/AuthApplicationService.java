@@ -1,26 +1,36 @@
 package com.kzzz3.argus.cortex.auth.application;
 
-import com.kzzz3.argus.cortex.auth.domain.AccessTokenStore;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import com.kzzz3.argus.cortex.auth.domain.AccountStore;
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
+import com.kzzz3.argus.cortex.auth.domain.RefreshSessionRecord;
+import com.kzzz3.argus.cortex.auth.domain.RefreshSessionStore;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 
 @Service
 public class AuthApplicationService {
 
 	private final AccountStore accountStore;
-	private final AccessTokenStore accessTokenStore;
+	private final JwtTokenService jwtTokenService;
+	private final OpaqueRefreshTokenService opaqueRefreshTokenService;
+	private final RefreshSessionStore refreshSessionStore;
 	private final AuthenticatedAccountResolver authenticatedAccountResolver;
 
 	public AuthApplicationService(
 			AccountStore accountStore,
-			AccessTokenStore accessTokenStore,
+			JwtTokenService jwtTokenService,
+			OpaqueRefreshTokenService opaqueRefreshTokenService,
+			RefreshSessionStore refreshSessionStore,
 			AuthenticatedAccountResolver authenticatedAccountResolver
 	) {
 		this.accountStore = accountStore;
-		this.accessTokenStore = accessTokenStore;
+		this.jwtTokenService = jwtTokenService;
+		this.opaqueRefreshTokenService = opaqueRefreshTokenService;
+		this.refreshSessionStore = refreshSessionStore;
 		this.authenticatedAccountResolver = authenticatedAccountResolver;
 	}
 
@@ -41,8 +51,9 @@ public class AuthApplicationService {
 		return new AuthResult(
 				registeredAccount.accountId(),
 				registeredAccount.displayName(),
-				accessTokenStore.issue(registeredAccount),
-				"Registration succeeded. Stage-1 server session issued."
+				jwtTokenService.issueAccessToken(registeredAccount),
+				issueRefreshSession(registeredAccount),
+				"Registration succeeded. JWT bearer token issued."
 		);
 	}
 
@@ -58,20 +69,60 @@ public class AuthApplicationService {
 		return new AuthResult(
 				accountRecord.accountId(),
 				accountRecord.displayName(),
-				accessTokenStore.issue(accountRecord),
-				"Login succeeded. Stage-1 server session issued."
+				jwtTokenService.issueAccessToken(accountRecord),
+				issueRefreshSession(accountRecord),
+				"Login succeeded. JWT bearer token issued."
 		);
 	}
 
-	public AuthResult restoreSession(String accessToken) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+	public AuthResult restoreSession(Jwt jwt) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolve(jwt);
 
 		return new AuthResult(
 				accountRecord.accountId(),
 				accountRecord.displayName(),
-				accessToken,
-				"Session restored from server token."
+				jwt.getTokenValue(),
+				null,
+				"Session restored from JWT bearer token."
 		);
+	}
+
+	public AuthResult refresh(RefreshTokenCommand request) {
+		String rawRefreshToken = request.refreshToken().trim();
+		String tokenHash = opaqueRefreshTokenService.hash(rawRefreshToken);
+		RefreshSessionRecord session = refreshSessionStore.findActiveByTokenHash(tokenHash, LocalDateTime.now())
+				.orElseThrow(InvalidCredentialsException::new);
+		AccountRecord accountRecord = accountStore.findByAccountId(session.accountId())
+				.orElseThrow(InvalidCredentialsException::new);
+		String nextRefreshToken = opaqueRefreshTokenService.issueToken();
+		refreshSessionStore.rotate(
+				session.sessionId(),
+				opaqueRefreshTokenService.hash(nextRefreshToken),
+				opaqueRefreshTokenService.expiresAt(),
+				LocalDateTime.now()
+		);
+		return new AuthResult(
+				accountRecord.accountId(),
+				accountRecord.displayName(),
+				jwtTokenService.issueAccessToken(accountRecord),
+				nextRefreshToken,
+				"Access token refreshed from refresh token."
+		);
+	}
+
+	private String issueRefreshSession(AccountRecord accountRecord) {
+		String refreshToken = opaqueRefreshTokenService.issueToken();
+		refreshSessionStore.create(new RefreshSessionRecord(
+				opaqueRefreshTokenService.newSessionId(),
+				accountRecord.accountId(),
+				accountRecord.displayName(),
+				opaqueRefreshTokenService.hash(refreshToken),
+				opaqueRefreshTokenService.expiresAt(),
+				LocalDateTime.now(),
+				LocalDateTime.now(),
+				null
+		));
+		return refreshToken;
 	}
 
 	private String normalizeAccount(String account) {

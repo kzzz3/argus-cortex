@@ -4,7 +4,6 @@ import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationSer
 import com.kzzz3.argus.cortex.media.application.CreateMediaUploadSessionCommand;
 import com.kzzz3.argus.cortex.media.application.FinalizeMediaUploadCommand;
 import com.kzzz3.argus.cortex.media.application.MediaUploadSessionApplicationService.MediaAttachmentDownload;
-import com.kzzz3.argus.cortex.shared.web.BearerTokenExtractor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -36,23 +35,19 @@ public class MediaUploadSessionController {
 
     @PostMapping("/upload-sessions")
 	public MediaUploadSessionResponse createUploadSession(
-			@RequestHeader("Authorization") String authorizationHeader,
 			@Valid @RequestBody CreateMediaUploadSessionRequest request
 	) {
 		return MediaUploadSessionResponse.from(mediaUploadSessionApplicationService.createUploadSession(
-				BearerTokenExtractor.extract(authorizationHeader),
 				new CreateMediaUploadSessionCommand(request.attachmentType(), request.fileName(), request.estimatedBytes())
 		));
 	}
 
     @PostMapping("/upload-sessions/{sessionId}/finalize")
 	public MediaAttachmentResponse finalizeUploadSession(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String sessionId,
             @Valid @RequestBody FinalizeMediaUploadRequest request
     ) {
 		return MediaAttachmentResponse.from(mediaUploadSessionApplicationService.finalizeUploadSession(
-				BearerTokenExtractor.extract(authorizationHeader),
 				sessionId,
 				new FinalizeMediaUploadCommand(
 						request.fileName(),
@@ -66,14 +61,12 @@ public class MediaUploadSessionController {
 
     @PutMapping("/upload-sessions/{sessionId}/content")
     public void uploadContent(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String sessionId,
             HttpServletRequest request
 	) {
-		String accessToken = BearerTokenExtractor.extract(authorizationHeader);
         try {
             byte[] content = request.getInputStream().readAllBytes();
-            mediaUploadSessionApplicationService.uploadContent(accessToken, sessionId, content);
+            mediaUploadSessionApplicationService.uploadContent(sessionId, content);
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to read upload payload.", ex);
         }
@@ -81,11 +74,9 @@ public class MediaUploadSessionController {
 
     @GetMapping("/attachments/{attachmentId}/download")
     public ResponseEntity<byte[]> downloadAttachment(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String attachmentId
 	) {
-		String accessToken = BearerTokenExtractor.extract(authorizationHeader);
-		MediaAttachmentDownload download = mediaUploadSessionApplicationService.loadAttachment(accessToken, attachmentId);
+		MediaAttachmentDownload download = mediaUploadSessionApplicationService.loadAttachment(attachmentId);
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         String candidateContentType = download.record().contentType();
         if (candidateContentType != null && !candidateContentType.isBlank()) {

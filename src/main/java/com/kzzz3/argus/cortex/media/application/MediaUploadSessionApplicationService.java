@@ -39,8 +39,8 @@ public class MediaUploadSessionApplicationService {
         this.mediaContentStorage = mediaContentStorage;
     }
 
-	public MediaUploadSession createUploadSession(String accessToken, CreateMediaUploadSessionCommand request) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+	public MediaUploadSession createUploadSession(CreateMediaUploadSessionCommand request) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         String normalizedFileName = request.fileName().trim();
         MediaAttachmentType attachmentType = request.attachmentType();
         long normalizedEstimatedBytes = Math.max(1, request.estimatedBytes());
@@ -71,11 +71,11 @@ public class MediaUploadSessionApplicationService {
         return mediaUploadSessionStore.save(session);
     }
 
-	public void uploadContent(String accessToken, String sessionId, byte[] content) {
+	public void uploadContent(String sessionId, byte[] content) {
         if (content == null) {
             throw new IllegalArgumentException("Upload payload is required.");
         }
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
         if (!session.accountId().equals(accountRecord.accountId())) {
@@ -94,11 +94,10 @@ public class MediaUploadSessionApplicationService {
     }
 
 	public MediaAttachmentRecord finalizeUploadSession(
-			String accessToken,
 			String sessionId,
 			FinalizeMediaUploadCommand request
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
         if (!session.accountId().equals(accountRecord.accountId())) {
@@ -115,8 +114,8 @@ public class MediaUploadSessionApplicationService {
         return mediaAttachmentStore.save(attachmentRecord);
     }
 
-	public MediaAttachmentDownload loadAttachment(String accessToken, String attachmentId) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolve(accessToken);
+	public MediaAttachmentDownload loadAttachment(String attachmentId) {
+		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         MediaAttachmentRecord record = mediaAttachmentStore.findByAttachmentId(attachmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Media attachment not found."));
         if (!accountRecord.accountId().equals(record.accountId())) {

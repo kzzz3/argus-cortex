@@ -56,15 +56,15 @@ public class PaymentApplicationService {
 	}
 
 	@Transactional
-	public WalletSummaryResponse getWalletSummary(String accessToken) {
-		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+	public WalletSummaryResponse getWalletSummary() {
+		AccountRecord account = authenticatedAccountResolver.resolveCurrent();
 		WalletRecord walletRecord = ensureWallet(account);
 		return WalletSummaryResponse.from(account, walletRecord);
 	}
 
 	@Transactional
-	public PaymentScanSession resolveScan(String accessToken, ResolvePaymentScanCommand command) {
-		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+	public PaymentScanSession resolveScan(ResolvePaymentScanCommand command) {
+		AccountRecord payer = authenticatedAccountResolver.resolveCurrent();
 		ensureWallet(payer);
 		ParsedPaymentQr parsedPaymentQr = parseScanPayload(command.scanPayload());
 		AccountRecord recipient = accountStore.findByAccountId(parsedPaymentQr.recipientAccountId())
@@ -90,8 +90,8 @@ public class PaymentApplicationService {
 	}
 
 	@Transactional
-	public PaymentRecord confirmPayment(String accessToken, String sessionId, ConfirmPaymentCommand command) {
-		AccountRecord payer = authenticatedAccountResolver.resolve(accessToken);
+	public PaymentRecord confirmPayment(String sessionId, ConfirmPaymentCommand command) {
+		AccountRecord payer = authenticatedAccountResolver.resolveCurrent();
 		ensureWallet(payer);
 		PaymentScanSession session = paymentScanSessionStore.findBySessionId(sessionId)
 				.orElseThrow(() -> new PaymentScanSessionNotFoundException(sessionId));
@@ -132,14 +132,14 @@ public class PaymentApplicationService {
 		return paymentRecordStore.save(paymentRecord);
 	}
 
-	public List<PaymentRecord> listPayments(String accessToken) {
-		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+	public List<PaymentRecord> listPayments() {
+		AccountRecord account = authenticatedAccountResolver.resolveCurrent();
 		ensureWallet(account);
 		return paymentRecordStore.listByParticipantAccountId(account.accountId());
 	}
 
-	public PaymentRecord getPaymentReceipt(String accessToken, String paymentId) {
-		AccountRecord account = authenticatedAccountResolver.resolve(accessToken);
+	public PaymentRecord getPaymentReceipt(String paymentId) {
+		AccountRecord account = authenticatedAccountResolver.resolveCurrent();
 		ensureWallet(account);
 		return paymentRecordStore.findByPaymentIdAndParticipantAccountId(paymentId, account.accountId())
 				.orElseThrow(() -> new PaymentRecordNotFoundException(paymentId));

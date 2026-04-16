@@ -6,6 +6,7 @@ public record AuthSuccessResponse(
 		String accountId,
 		String displayName,
 		String accessToken,
+		String refreshToken,
 		String message
 ) {
 	public static AuthSuccessResponse from(AuthResult result) {
@@ -13,6 +14,7 @@ public record AuthSuccessResponse(
 				result.accountId(),
 				result.displayName(),
 				result.accessToken(),
+				result.refreshToken(),
 				result.message()
 		);
 	}
