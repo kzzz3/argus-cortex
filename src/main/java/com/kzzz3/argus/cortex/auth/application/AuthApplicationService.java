@@ -8,6 +8,7 @@ import com.kzzz3.argus.cortex.auth.domain.RefreshSessionRecord;
 import com.kzzz3.argus.cortex.auth.domain.RefreshSessionStore;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -20,19 +21,22 @@ public class AuthApplicationService {
 	private final OpaqueRefreshTokenService opaqueRefreshTokenService;
 	private final RefreshSessionStore refreshSessionStore;
 	private final AuthenticatedAccountResolver authenticatedAccountResolver;
+	private final PasswordEncoder passwordEncoder;
 
 	public AuthApplicationService(
 			AccountStore accountStore,
 			JwtTokenService jwtTokenService,
 			OpaqueRefreshTokenService opaqueRefreshTokenService,
 			RefreshSessionStore refreshSessionStore,
-			AuthenticatedAccountResolver authenticatedAccountResolver
+			AuthenticatedAccountResolver authenticatedAccountResolver,
+			PasswordEncoder passwordEncoder
 	) {
 		this.accountStore = accountStore;
 		this.jwtTokenService = jwtTokenService;
 		this.opaqueRefreshTokenService = opaqueRefreshTokenService;
 		this.refreshSessionStore = refreshSessionStore;
 		this.authenticatedAccountResolver = authenticatedAccountResolver;
+		this.passwordEncoder = passwordEncoder;
 	}
 
 	public AuthResult register(RegisterCommand request) {
@@ -45,7 +49,7 @@ public class AuthApplicationService {
 				new AccountRecord(
 						normalizedAccount,
 						request.displayName().trim(),
-						request.password()
+						passwordEncoder.encode(request.password())
 				)
 		);
 
@@ -63,7 +67,7 @@ public class AuthApplicationService {
 		AccountRecord accountRecord = accountStore.findByAccountId(normalizedAccount)
 				.orElseThrow(InvalidCredentialsException::new);
 
-		if (!request.password().equals(accountRecord.passwordHash())) {
+		if (!passwordEncoder.matches(request.password(), accountRecord.passwordHash())) {
 			throw new InvalidCredentialsException();
 		}
 

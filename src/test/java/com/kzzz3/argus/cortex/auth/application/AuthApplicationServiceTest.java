@@ -27,6 +27,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
 class AuthApplicationServiceTest {
@@ -36,10 +38,12 @@ class AuthApplicationServiceTest {
 	private AuthApplicationService authApplicationService;
 	private AuthenticatedAccountResolver authenticatedAccountResolver;
 	private InMemoryAccountStore accountStore;
+	private PasswordEncoder passwordEncoder;
 
 	@BeforeEach
 	void setUp() {
 		accountStore = new InMemoryAccountStore();
+		passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
 		JwtSecretKeyProvider jwtSecretKeyProvider = new JwtSecretKeyProvider(TEST_SECRET);
 		JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(new SecretKeySpec(TEST_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256")));
 		JwtDecoder jwtDecoder = NimbusJwtDecoder.withSecretKey(new SecretKeySpec(TEST_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
@@ -51,7 +55,8 @@ class AuthApplicationServiceTest {
 				new JwtTokenService(jwtEncoder, "PT168H", "PT168H", jwtSecretKeyProvider),
 				new OpaqueRefreshTokenService("PT168H"),
 				new InMemoryRefreshSessionStore(),
-				authenticatedAccountResolver
+				authenticatedAccountResolver,
+				passwordEncoder
 		);
 	}
 
@@ -107,6 +112,18 @@ class AuthApplicationServiceTest {
 	}
 
 	@Test
+	void registerStoresPasswordAsHash() {
+		authApplicationService.register(new RegisterCommand("Argus Tester", "tester-hash", "secret123"));
+
+		String storedValue = accountStore.findByAccountId("tester-hash")
+				.orElseThrow()
+				.passwordHash();
+
+		assertTrue(storedValue.startsWith("{bcrypt}"));
+		assertTrue(passwordEncoder.matches("secret123", storedValue));
+	}
+
+	@Test
 	void refreshUsesUtcNowForSessionLookupInNonUtcDefaultTimezone() {
 		TimeZone original = TimeZone.getDefault();
 		TimeZone.setDefault(TimeZone.getTimeZone("GMT+08:00"));
@@ -125,13 +142,14 @@ class AuthApplicationServiceTest {
 					new JwtTokenService(jwtEncoder, "PT168H", "PT168H", jwtSecretKeyProvider),
 					refreshTokenService,
 					refreshSessionStore,
-					resolver
+					resolver,
+					PasswordEncoderFactories.createDelegatingPasswordEncoder()
 			);
 
 			AccountRecord account = localAccountStore.save(new AccountRecord(
 					"tester-timezone",
 					"Argus Tester",
-					"secret123"
+					PasswordEncoderFactories.createDelegatingPasswordEncoder().encode("secret123")
 			));
 			String rawRefreshToken = refreshTokenService.issueToken();
 			refreshSessionStore.session = new RefreshSessionRecord(
@@ -169,7 +187,8 @@ class AuthApplicationServiceTest {
 				),
 				new OpaqueRefreshTokenService("PT168H"),
 				refreshSessionStore,
-				authenticatedAccountResolver
+				authenticatedAccountResolver,
+				passwordEncoder
 		);
 
 		authApplicationService.register(new RegisterCommand("Argus Tester", "tester-utc", "secret123"));
