@@ -10,14 +10,12 @@ public class ConversationMessageEntity {
 	@TableId
 	private String id;
 	private String clientMessageId;
-	private String ownerAccountId;
 	private String conversationId;
 	private String senderAccountId;
 	private String senderDisplayName;
 	private String body;
 	private String attachmentId;
 	private String timestampLabel;
-	private Boolean fromCurrentUser;
 	private String deliveryStatus;
 	private String statusUpdatedAt;
 	private Long sequenceNo;
@@ -27,8 +25,6 @@ public class ConversationMessageEntity {
 	public void setId(String id) { this.id = id; }
 	public String getClientMessageId() { return clientMessageId; }
 	public void setClientMessageId(String clientMessageId) { this.clientMessageId = clientMessageId; }
-	public String getOwnerAccountId() { return ownerAccountId; }
-	public void setOwnerAccountId(String ownerAccountId) { this.ownerAccountId = ownerAccountId; }
 	public String getConversationId() { return conversationId; }
 	public void setConversationId(String conversationId) { this.conversationId = conversationId; }
 	public String getSenderAccountId() { return senderAccountId; }
@@ -41,8 +37,6 @@ public class ConversationMessageEntity {
 	public void setAttachmentId(String attachmentId) { this.attachmentId = attachmentId; }
 	public String getTimestampLabel() { return timestampLabel; }
 	public void setTimestampLabel(String timestampLabel) { this.timestampLabel = timestampLabel; }
-	public Boolean getFromCurrentUser() { return fromCurrentUser; }
-	public void setFromCurrentUser(Boolean fromCurrentUser) { this.fromCurrentUser = fromCurrentUser; }
 	public String getDeliveryStatus() { return deliveryStatus; }
 	public void setDeliveryStatus(String deliveryStatus) { this.deliveryStatus = deliveryStatus; }
 	public String getStatusUpdatedAt() { return statusUpdatedAt; }

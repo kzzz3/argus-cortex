@@ -279,6 +279,22 @@ class TextImFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.body").value("Follow-up 2"));
 
+		mockMvc.perform(get("/api/v1/conversations")
+						.header("Authorization", bearer(lisiAccessToken))
+						.param("recentWindowDays", "7"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[?(@.id=='conv-direct-lisi-tester')].unreadCount").value(org.hamcrest.Matchers.contains(3)));
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(lisiAccessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "50"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages", hasSize(3)))
+				.andExpect(jsonPath("$.messages[0].body").value("Hello Zhang San"))
+				.andExpect(jsonPath("$.messages[0].fromCurrentUser").value(false))
+				.andExpect(jsonPath("$.messages[2].body").value("Follow-up 2"));
+
 		MvcResult continuationPageOne = mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
 						.header("Authorization", bearer(accessToken))
 						.param("recentWindowDays", "7")
@@ -399,7 +415,7 @@ class TextImFlowIntegrationTest {
 		org.junit.jupiter.api.Assertions.assertEquals(attachmentId, attachmentMessageNode.get("attachment").get("attachmentId").asText());
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/receipt", conversationId, firstMessageId)
-						.header("Authorization", bearer(accessToken))
+						.header("Authorization", bearer(lisiAccessToken))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"receiptType":"DELIVERED"}
@@ -408,7 +424,7 @@ class TextImFlowIntegrationTest {
 				.andExpect(jsonPath("$.deliveryStatus").value("DELIVERED"));
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/receipt", conversationId, firstMessageId)
-						.header("Authorization", bearer(accessToken))
+						.header("Authorization", bearer(lisiAccessToken))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"receiptType":"READ"}
@@ -417,13 +433,20 @@ class TextImFlowIntegrationTest {
 				.andExpect(jsonPath("$.deliveryStatus").value("READ"));
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/messages/{messageId}/receipt", conversationId, firstMessageId)
-						.header("Authorization", bearer(accessToken))
+						.header("Authorization", bearer(lisiAccessToken))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"receiptType":"BROKEN"}
 								"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(accessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "50"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages[0].deliveryStatus").value("READ"));
 
 		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
 						.header("Authorization", bearer(accessToken))
@@ -441,6 +464,15 @@ class TextImFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.deliveryStatus").value("RECALLED"))
 				.andExpect(jsonPath("$.body").value("You recalled a message"));
+
+		mockMvc.perform(get("/api/v1/conversations/{conversationId}/messages", conversationId)
+						.header("Authorization", bearer(lisiAccessToken))
+						.param("recentWindowDays", "7")
+						.param("limit", "50"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.messages[0].deliveryStatus").value("RECALLED"))
+				.andExpect(jsonPath("$.messages[0].body").value("Message recalled"))
+				.andExpect(jsonPath("$.messages[0].fromCurrentUser").value(false));
 
 		mockMvc.perform(post("/api/v1/conversations/{conversationId}/read", conversationId)
 						.header("Authorization", bearer(accessToken))

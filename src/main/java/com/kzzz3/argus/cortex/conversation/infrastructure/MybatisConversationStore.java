@@ -19,9 +19,11 @@ import com.kzzz3.argus.cortex.conversation.infrastructure.mapper.ConversationThr
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentRecord;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentStore;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
@@ -38,7 +40,12 @@ public class MybatisConversationStore implements ConversationStore {
 	private final ConversationMessageMapper messageMapper;
 	private final MediaAttachmentStore mediaAttachmentStore;
 
-	public MybatisConversationStore(ConversationThreadMapper threadMapper, ConversationMemberMapper memberMapper, ConversationMessageMapper messageMapper, MediaAttachmentStore mediaAttachmentStore) {
+	public MybatisConversationStore(
+			ConversationThreadMapper threadMapper,
+			ConversationMemberMapper memberMapper,
+			ConversationMessageMapper messageMapper,
+			MediaAttachmentStore mediaAttachmentStore
+	) {
 		this.threadMapper = threadMapper;
 		this.memberMapper = memberMapper;
 		this.messageMapper = messageMapper;
@@ -51,13 +58,13 @@ public class MybatisConversationStore implements ConversationStore {
 				.eq(ConversationThreadEntity::getOwnerAccountId, accountRecord.accountId())
 				.orderByDesc(ConversationThreadEntity::getUpdatedAt))
 				.stream()
-				.map(this::toSummary)
+				.map(thread -> toSummary(accountRecord.accountId(), thread))
 				.toList();
 	}
 
 	@Override
 	public ConversationDetail getConversationDetail(AccountRecord accountRecord, String conversationId) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
+		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId);
 		List<String> members = memberMapper.selectList(new LambdaQueryWrapper<ConversationMemberEntity>()
 				.eq(ConversationMemberEntity::getOwnerAccountId, accountRecord.accountId())
 				.eq(ConversationMemberEntity::getConversationId, conversationId)
@@ -79,7 +86,7 @@ public class MybatisConversationStore implements ConversationStore {
 
 	@Override
 	public ConversationMessagePage listMessages(AccountRecord accountRecord, String conversationId, int recentWindowDays, int limit, String sinceCursor) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, recentWindowDays);
+		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId);
 		if (thread.getSyncCursor().equals(sinceCursor)) {
 			return new ConversationMessagePage(List.of(), thread.getSyncCursor(), recentWindowDays, limit);
 		}
@@ -90,85 +97,93 @@ public class MybatisConversationStore implements ConversationStore {
 		List<ConversationMessageEntity> entities;
 		String nextSyncCursor;
 		if (requestedCursor != null && currentCursor != null && currentCursor.sequence() > requestedCursor.sequence()) {
-			entities = selectMessagesAfterSequence(accountRecord.accountId(), conversationId, requestedCursor.sequence(), limit);
+			entities = selectMessagesAfterSequence(conversationId, requestedCursor.sequence(), limit);
 			nextSyncCursor = entities.isEmpty()
 					? thread.getSyncCursor()
 					: ConversationSyncCursor.of(conversationId, entities.get(entities.size() - 1).getSequenceNo(), currentCursor.revision()).encoded();
 		} else {
-			entities = selectRecentMessages(accountRecord.accountId(), conversationId, limit);
+			entities = selectRecentMessages(conversationId, limit);
 			nextSyncCursor = thread.getSyncCursor();
 		}
 
 		List<ConversationMessage> messages = entities.stream()
-				.map(this::toMessage)
+				.map(entity -> toMessage(accountRecord.accountId(), entity))
 				.toList();
 		return new ConversationMessagePage(messages, nextSyncCursor, recentWindowDays, limit);
 	}
 
 	@Override
 	public ConversationMessage sendMessage(AccountRecord accountRecord, String conversationId, String clientMessageId, String body, @Nullable ConversationMessageAttachment attachment) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
-		if (clientMessageId != null && !clientMessageId.isBlank()) {
+		requireThread(accountRecord.accountId(), conversationId);
+		String normalizedClientMessageId = clientMessageId == null || clientMessageId.isBlank() ? null : clientMessageId.trim();
+		if (normalizedClientMessageId != null) {
 			ConversationMessageEntity existing = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
-					.eq(ConversationMessageEntity::getOwnerAccountId, accountRecord.accountId())
 					.eq(ConversationMessageEntity::getConversationId, conversationId)
-					.eq(ConversationMessageEntity::getClientMessageId, clientMessageId));
+					.eq(ConversationMessageEntity::getSenderAccountId, accountRecord.accountId())
+					.eq(ConversationMessageEntity::getClientMessageId, normalizedClientMessageId));
 			if (existing != null) {
-				return toMessage(existing);
+				return toMessage(accountRecord.accountId(), existing);
 			}
 		}
-		long nextSequence = nextSequence(accountRecord.accountId(), conversationId);
+
+		LocalDateTime createdAt = ConversationTimeFormatter.nowLocal();
+		OffsetDateTime statusUpdatedAt = ConversationTimeFormatter.nowOffset();
+		long nextSequence = nextSequence(conversationId);
 		ConversationMessageEntity entity = new ConversationMessageEntity();
 		entity.setId("msg-" + UUID.randomUUID());
-		entity.setClientMessageId(clientMessageId == null || clientMessageId.isBlank() ? entity.getId() : clientMessageId);
-		entity.setOwnerAccountId(accountRecord.accountId());
+		entity.setClientMessageId(normalizedClientMessageId == null ? entity.getId() : normalizedClientMessageId);
 		entity.setConversationId(conversationId);
 		entity.setSenderAccountId(accountRecord.accountId());
 		entity.setSenderDisplayName(accountRecord.displayName());
 		entity.setBody(body.trim());
 		entity.setAttachmentId(attachment == null ? null : attachment.attachmentId());
-		entity.setTimestampLabel("Now");
-		entity.setFromCurrentUser(true);
-		entity.setDeliveryStatus("DELIVERED");
-		entity.setStatusUpdatedAt("2026-04-10T21:10:00+08:00");
+		entity.setTimestampLabel(ConversationTimeFormatter.formatTimestampLabel(createdAt));
+		entity.setDeliveryStatus("SENT");
+		entity.setStatusUpdatedAt(ConversationTimeFormatter.formatStatusUpdatedAt(statusUpdatedAt));
 		entity.setSequenceNo(nextSequence);
-		entity.setCreatedAt(LocalDateTime.now());
+		entity.setCreatedAt(createdAt);
 		messageMapper.insert(entity);
-		advanceThreadCursor(thread, nextSequence);
-		return toMessage(entity);
+		advanceAllThreadCursors(conversationId, nextSequence, accountRecord.accountId());
+		return toMessage(accountRecord.accountId(), entity);
 	}
 
 	@Override
 	public ConversationMessage applyReceipt(AccountRecord accountRecord, String conversationId, String messageId, String receiptType) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
-		ConversationMessageEntity entity = requireMessage(accountRecord.accountId(), conversationId, messageId);
-		String nextStatus = receiptType == null ? "DELIVERED" : receiptType.trim().toUpperCase();
+		requireThread(accountRecord.accountId(), conversationId);
+		ConversationMessageEntity entity = requireMessage(conversationId, messageId);
+		String normalizedReceiptType = normalizeReceiptType(receiptType);
+		String nextStatus = mergeDeliveryStatus(entity.getDeliveryStatus(), normalizedReceiptType);
+		if (nextStatus.equals(entity.getDeliveryStatus()) || accountRecord.accountId().equals(entity.getSenderAccountId())) {
+			return toMessage(accountRecord.accountId(), entity);
+		}
 		entity.setDeliveryStatus(nextStatus);
-		entity.setStatusUpdatedAt("2026-04-10T22:30:00+08:00");
+		entity.setStatusUpdatedAt(ConversationTimeFormatter.formatStatusUpdatedAt(ConversationTimeFormatter.nowOffset()));
 		messageMapper.updateById(entity);
-		advanceThreadCursor(thread, entity.getSequenceNo());
-		return toMessage(entity);
+		advanceAllThreadCursors(conversationId, entity.getSequenceNo(), null);
+		return toMessage(accountRecord.accountId(), entity);
 	}
 
 	@Override
 	public ConversationMessage recallMessage(AccountRecord accountRecord, String conversationId, String messageId) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
-		ConversationMessageEntity entity = requireMessage(accountRecord.accountId(), conversationId, messageId);
-		entity.setSenderDisplayName(accountRecord.displayName());
-		entity.setBody("You recalled a message");
+		requireThread(accountRecord.accountId(), conversationId);
+		ConversationMessageEntity entity = requireMessage(conversationId, messageId);
+		if (!accountRecord.accountId().equals(entity.getSenderAccountId())) {
+			throw new IllegalArgumentException("Only the sender can recall this message.");
+		}
+		entity.setBody("Message recalled");
 		entity.setDeliveryStatus("RECALLED");
-		entity.setStatusUpdatedAt("2026-04-10T21:11:00+08:00");
+		entity.setStatusUpdatedAt(ConversationTimeFormatter.formatStatusUpdatedAt(ConversationTimeFormatter.nowOffset()));
 		messageMapper.updateById(entity);
-		advanceThreadCursor(thread, entity.getSequenceNo());
-		return toMessage(entity);
+		advanceAllThreadCursors(conversationId, entity.getSequenceNo(), null);
+		return toMessage(accountRecord.accountId(), entity);
 	}
 
 	@Override
 	public ConversationSummary markConversationRead(AccountRecord accountRecord, String conversationId) {
-		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId, 7);
+		ConversationThreadEntity thread = requireThread(accountRecord.accountId(), conversationId);
 		thread.setUnreadCount(0);
-		advanceThreadCursor(thread, latestSequence(accountRecord.accountId(), conversationId));
-		return toSummary(thread);
+		advanceThreadCursor(thread, latestSequence(conversationId));
+		return toSummary(accountRecord.accountId(), thread);
 	}
 
 	@Override
@@ -176,23 +191,30 @@ public class MybatisConversationStore implements ConversationStore {
 		String conversationId = directConversationId(owner.accountId(), friend.accountId());
 		ConversationThreadEntity ownerThread = ensureDirectConversationThread(owner.accountId(), friend.displayName(), conversationId);
 		ensureDirectConversationThread(friend.accountId(), owner.displayName(), conversationId);
-		return toSummary(ownerThread);
+		ensureMember(owner.accountId(), conversationId, owner.accountId(), owner.displayName());
+		ensureMember(owner.accountId(), conversationId, friend.accountId(), friend.displayName());
+		ensureMember(friend.accountId(), conversationId, owner.accountId(), owner.displayName());
+		ensureMember(friend.accountId(), conversationId, friend.accountId(), friend.displayName());
+		return toSummary(owner.accountId(), ownerThread);
 	}
 
-	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId, int recentWindowDays) {
+	private ConversationThreadEntity requireThread(String ownerAccountId, String conversationId) {
 		ConversationThreadEntity entity = threadMapper.selectOne(new LambdaQueryWrapper<ConversationThreadEntity>()
 				.eq(ConversationThreadEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationThreadEntity::getConversationId, conversationId));
-		if (entity == null) throw new ConversationNotFoundException(conversationId);
+		if (entity == null) {
+			throw new ConversationNotFoundException(conversationId);
+		}
 		return entity;
 	}
 
-	private ConversationMessageEntity requireMessage(String ownerAccountId, String conversationId, String messageId) {
+	private ConversationMessageEntity requireMessage(String conversationId, String messageId) {
 		ConversationMessageEntity entity = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
-				.eq(ConversationMessageEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationMessageEntity::getConversationId, conversationId)
 				.eq(ConversationMessageEntity::getId, messageId));
-		if (entity == null) throw new MessageNotFoundException(messageId);
+		if (entity == null) {
+			throw new MessageNotFoundException(messageId);
+		}
 		return entity;
 	}
 
@@ -204,7 +226,7 @@ public class MybatisConversationStore implements ConversationStore {
 		entity.setSubtitle(subtitle);
 		entity.setUnreadCount(unreadCount);
 		entity.setSyncCursor(ConversationSyncCursor.of(conversationId, 0L, 0L).encoded());
-		entity.setUpdatedAt(LocalDateTime.now());
+		entity.setUpdatedAt(ConversationTimeFormatter.nowLocal());
 		threadMapper.insert(entity);
 	}
 
@@ -214,7 +236,7 @@ public class MybatisConversationStore implements ConversationStore {
 		entity.setConversationId(conversationId);
 		entity.setMemberAccountId(memberAccountId);
 		entity.setMemberDisplayName(memberDisplayName);
-		entity.setJoinedAt(LocalDateTime.now());
+		entity.setJoinedAt(ConversationTimeFormatter.nowLocal());
 		memberMapper.insert(entity);
 	}
 
@@ -241,37 +263,44 @@ public class MybatisConversationStore implements ConversationStore {
 				.eq(ConversationThreadEntity::getConversationId, conversationId));
 	}
 
-
-	private long nextSequence(String ownerAccountId, String conversationId) {
-		return latestSequence(ownerAccountId, conversationId) + 1L;
+	private long nextSequence(String conversationId) {
+		return latestSequence(conversationId) + 1L;
 	}
 
-	private long latestSequence(String ownerAccountId, String conversationId) {
+	private long latestSequence(String conversationId) {
 		ConversationMessageEntity latest = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
-				.eq(ConversationMessageEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationMessageEntity::getConversationId, conversationId)
 				.orderByDesc(ConversationMessageEntity::getSequenceNo)
 				.last("LIMIT 1"));
 		return latest == null ? 0L : latest.getSequenceNo();
 	}
 
-	private List<ConversationMessageEntity> selectMessagesAfterSequence(String ownerAccountId, String conversationId, long sequenceNo, int limit) {
+	private List<ConversationMessageEntity> selectMessagesAfterSequence(String conversationId, long sequenceNo, int limit) {
 		return messageMapper.selectList(new LambdaQueryWrapper<ConversationMessageEntity>()
-				.eq(ConversationMessageEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationMessageEntity::getConversationId, conversationId)
 				.gt(ConversationMessageEntity::getSequenceNo, sequenceNo)
 				.orderByAsc(ConversationMessageEntity::getSequenceNo)
 				.last("LIMIT " + limit));
 	}
 
-	private List<ConversationMessageEntity> selectRecentMessages(String ownerAccountId, String conversationId, int limit) {
+	private List<ConversationMessageEntity> selectRecentMessages(String conversationId, int limit) {
 		List<ConversationMessageEntity> recentMessages = new ArrayList<>(messageMapper.selectList(new LambdaQueryWrapper<ConversationMessageEntity>()
-				.eq(ConversationMessageEntity::getOwnerAccountId, ownerAccountId)
 				.eq(ConversationMessageEntity::getConversationId, conversationId)
 				.orderByDesc(ConversationMessageEntity::getSequenceNo)
 				.last("LIMIT " + limit)));
 		Collections.reverse(recentMessages);
 		return recentMessages;
+	}
+
+	private void advanceAllThreadCursors(String conversationId, long affectedSequenceNo, @Nullable String senderAccountId) {
+		List<ConversationThreadEntity> threads = threadMapper.selectList(new LambdaQueryWrapper<ConversationThreadEntity>()
+				.eq(ConversationThreadEntity::getConversationId, conversationId));
+		for (ConversationThreadEntity thread : threads) {
+			if (senderAccountId != null && !senderAccountId.equals(thread.getOwnerAccountId())) {
+				thread.setUnreadCount((thread.getUnreadCount() == null ? 0 : thread.getUnreadCount()) + 1);
+			}
+			advanceThreadCursor(thread, affectedSequenceNo);
+		}
 	}
 
 	private void advanceThreadCursor(ConversationThreadEntity thread, long affectedSequenceNo) {
@@ -281,17 +310,16 @@ public class MybatisConversationStore implements ConversationStore {
 				? affectedSequenceNo
 				: Math.max(currentCursor.sequence(), affectedSequenceNo);
 		thread.setSyncCursor(ConversationSyncCursor.of(thread.getConversationId(), nextSequence, nextRevision).encoded());
-		thread.setUpdatedAt(LocalDateTime.now());
+		thread.setUpdatedAt(ConversationTimeFormatter.nowLocal());
 		threadMapper.updateById(thread);
 	}
 
-	private ConversationSummary toSummary(ConversationThreadEntity entity) {
+	private ConversationSummary toSummary(String viewerAccountId, ConversationThreadEntity entity) {
 		ConversationMessageEntity latestMessage = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
-				.eq(ConversationMessageEntity::getOwnerAccountId, entity.getOwnerAccountId())
 				.eq(ConversationMessageEntity::getConversationId, entity.getConversationId())
 				.orderByDesc(ConversationMessageEntity::getSequenceNo)
 				.last("LIMIT 1"));
-		String preview = latestMessage == null ? "No messages yet" : latestMessage.getBody();
+		String preview = latestMessage == null ? "No messages yet" : renderBody(viewerAccountId, latestMessage);
 		String timestampLabel = latestMessage == null ? "--:--" : latestMessage.getTimestampLabel();
 		return new ConversationSummary(
 				entity.getConversationId(),
@@ -299,23 +327,32 @@ public class MybatisConversationStore implements ConversationStore {
 				entity.getSubtitle(),
 				preview,
 				timestampLabel,
-				entity.getUnreadCount(),
+				entity.getUnreadCount() == null ? 0 : entity.getUnreadCount(),
 				entity.getSyncCursor()
 		);
 	}
 
-	private ConversationMessage toMessage(ConversationMessageEntity entity) {
+	private ConversationMessage toMessage(String viewerAccountId, ConversationMessageEntity entity) {
 		return new ConversationMessage(
 				entity.getId(),
 				entity.getConversationId(),
 				entity.getSenderDisplayName(),
-				entity.getBody(),
+				renderBody(viewerAccountId, entity),
 				entity.getTimestampLabel(),
-				Boolean.TRUE.equals(entity.getFromCurrentUser()),
+				viewerAccountId.equals(entity.getSenderAccountId()),
 				entity.getDeliveryStatus(),
 				entity.getStatusUpdatedAt(),
 				resolveAttachment(entity.getAttachmentId())
 		);
+	}
+
+	private String renderBody(String viewerAccountId, ConversationMessageEntity entity) {
+		if ("RECALLED".equals(entity.getDeliveryStatus())) {
+			return viewerAccountId.equals(entity.getSenderAccountId())
+					? "You recalled a message"
+					: "Message recalled";
+		}
+		return entity.getBody();
 	}
 
 	@Nullable
@@ -336,6 +373,30 @@ public class MybatisConversationStore implements ConversationStore {
 				record.contentType(),
 				record.contentLength()
 		);
+	}
+
+	private String normalizeReceiptType(String receiptType) {
+		return receiptType == null ? "DELIVERED" : receiptType.trim().toUpperCase(Locale.ROOT);
+	}
+
+	private String mergeDeliveryStatus(String currentStatus, String nextStatus) {
+		if ("RECALLED".equals(currentStatus)) {
+			return currentStatus;
+		}
+		return deliveryRank(nextStatus) > deliveryRank(currentStatus) ? nextStatus : currentStatus;
+	}
+
+	private int deliveryRank(@Nullable String status) {
+		if (status == null) {
+			return 0;
+		}
+		return switch (status.toUpperCase(Locale.ROOT)) {
+			case "SENT" -> 1;
+			case "DELIVERED" -> 2;
+			case "READ" -> 3;
+			case "RECALLED" -> 4;
+			default -> 0;
+		};
 	}
 
 	private String directConversationId(String accountIdA, String accountIdB) {
