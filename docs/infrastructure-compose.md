@@ -33,6 +33,14 @@ Those belong to later phases once the current Spring Boot module actually starts
 
 2. Adjust passwords/secrets in `.env`
 
+   Required values now include:
+
+   - `MYSQL_ROOT_PASSWORD`
+   - `MYSQL_DATABASE`
+   - `MYSQL_USER`
+   - `MYSQL_PASSWORD`
+   - `ARGUS_JWT_SECRET` (use a private value with at least 32 characters)
+
 3. Start the stack:
 
    - `docker compose up -d`
@@ -45,6 +53,14 @@ Those belong to later phases once the current Spring Boot module actually starts
    - Kafka UI: `http://localhost:8081`
    - MinIO API: `http://localhost:9000`
    - MinIO Console: `http://localhost:9001`
+
+5. If you change the canonical Flyway baseline in active development (for example by editing `V1__create_text_im_schema.sql`), clear the local MySQL database before restarting the app so Flyway can rebuild from the current baseline.
+
+   Example dev-only reset flow:
+
+   - stop the app
+   - drop and recreate the local `argus_cortex` schema, or remove the local MySQL volume
+   - restart `argus-cortex` so Flyway reapplies the current baseline
 
 ## Current deployment scope
 
