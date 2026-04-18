@@ -20,6 +20,10 @@ class JwtSecretKeyProviderTest {
 				IllegalStateException.class,
 				() -> new JwtSecretKeyProvider("REPLACE_WITH_A_LONG_RANDOM_JWT_SECRET")
 		);
+		assertThrows(
+				IllegalStateException.class,
+				() -> new JwtSecretKeyProvider("replace_with_a_private_jwt_secret_min_32_chars")
+		);
 	}
 
 	@Test
