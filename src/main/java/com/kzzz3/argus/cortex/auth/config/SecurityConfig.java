@@ -1,9 +1,5 @@
 package com.kzzz3.argus.cortex.auth.config;
 
-import java.nio.charset.StandardCharsets;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +18,8 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 
@@ -42,9 +40,8 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public JwtDecoder jwtDecoder(@Value("${argus.auth.jwt.secret:argus-stage1-dev-secret-key-please-change-1234567890}") String secret) {
-		SecretKey secretKey = secretKey(secret);
-		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
+	public JwtDecoder jwtDecoder(JwtSecretKeyProvider jwtSecretKeyProvider) {
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKeyProvider.secretKey())
 				.macAlgorithm(MacAlgorithm.HS256)
 				.build();
 		OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
@@ -58,11 +55,12 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public JwtEncoder jwtEncoder(@Value("${argus.auth.jwt.secret:argus-stage1-dev-secret-key-please-change-1234567890}") String secret) {
-		return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey(secret)));
+	public JwtEncoder jwtEncoder(JwtSecretKeyProvider jwtSecretKeyProvider) {
+		return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKeyProvider.secretKey()));
 	}
 
-	private SecretKey secretKey(String secret) {
-		return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+		return new BCryptPasswordEncoder();
 	}
 }

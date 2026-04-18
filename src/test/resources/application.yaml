@@ -1,4 +1,7 @@
 argus:
+  auth:
+    jwt:
+      secret: test-jwt-secret-for-integration-only-1234567890
   persistence:
     mode: memory
 

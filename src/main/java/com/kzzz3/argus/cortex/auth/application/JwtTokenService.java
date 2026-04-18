@@ -1,10 +1,10 @@
 package com.kzzz3.argus.cortex.auth.application;
 
+import com.kzzz3.argus.cortex.auth.config.JwtSecretKeyProvider;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -15,8 +15,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
-import java.nio.charset.StandardCharsets;
-import javax.crypto.spec.SecretKeySpec;
 
 @Component
 public class JwtTokenService {
@@ -28,14 +26,14 @@ public class JwtTokenService {
 
 	public JwtTokenService(
 			JwtEncoder jwtEncoder,
-			@Value("${argus.auth.jwt.ttl:PT2H}") String accessTokenTtl,
-			@Value("${argus.auth.jwt.refresh-ttl:PT168H}") String refreshTokenTtl,
-			@Value("${argus.auth.jwt.secret:argus-stage1-dev-secret-key-please-change-1234567890}") String secret
+			@org.springframework.beans.factory.annotation.Value("${argus.auth.jwt.ttl:PT2H}") String accessTokenTtl,
+			@org.springframework.beans.factory.annotation.Value("${argus.auth.jwt.refresh-ttl:PT168H}") String refreshTokenTtl,
+			JwtSecretKeyProvider jwtSecretKeyProvider
 	) {
 		this.jwtEncoder = jwtEncoder;
 		this.accessTokenTtl = Duration.parse(accessTokenTtl);
 		this.refreshTokenTtl = Duration.parse(refreshTokenTtl);
-		this.refreshTokenDecoder = NimbusJwtDecoder.withSecretKey(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"))
+		this.refreshTokenDecoder = NimbusJwtDecoder.withSecretKey(jwtSecretKeyProvider.secretKey())
 				.macAlgorithm(MacAlgorithm.HS256)
 				.build();
 	}

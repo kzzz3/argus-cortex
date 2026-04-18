@@ -27,7 +27,7 @@ mybatis-plus:
 argus:
   auth:
     jwt:
-      secret: ${ARGUS_JWT_SECRET:argus-stage1-dev-secret-key-please-change-1234567890}
+      secret: ${ARGUS_JWT_SECRET}
       ttl: ${ARGUS_JWT_TTL:PT168H}
       refresh-ttl: ${ARGUS_JWT_REFRESH_TTL:PT168H}
   persistence:
