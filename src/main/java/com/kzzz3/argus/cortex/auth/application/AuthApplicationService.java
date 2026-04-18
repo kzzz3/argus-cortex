@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class AuthApplicationService {
@@ -62,7 +63,7 @@ public class AuthApplicationService {
 		AccountRecord accountRecord = accountStore.findByAccountId(normalizedAccount)
 				.orElseThrow(InvalidCredentialsException::new);
 
-		if (!accountRecord.password().equals(request.password())) {
+		if (!request.password().equals(accountRecord.passwordHash())) {
 			throw new InvalidCredentialsException();
 		}
 
@@ -90,7 +91,8 @@ public class AuthApplicationService {
 	public AuthResult refresh(RefreshTokenCommand request) {
 		String rawRefreshToken = request.refreshToken().trim();
 		String tokenHash = opaqueRefreshTokenService.hash(rawRefreshToken);
-		RefreshSessionRecord session = refreshSessionStore.findActiveByTokenHash(tokenHash, LocalDateTime.now())
+		LocalDateTime now = utcNow();
+		RefreshSessionRecord session = refreshSessionStore.findActiveByTokenHash(tokenHash, now)
 				.orElseThrow(InvalidCredentialsException::new);
 		AccountRecord accountRecord = accountStore.findByAccountId(session.accountId())
 				.orElseThrow(InvalidCredentialsException::new);
@@ -99,7 +101,7 @@ public class AuthApplicationService {
 				session.sessionId(),
 				opaqueRefreshTokenService.hash(nextRefreshToken),
 				opaqueRefreshTokenService.expiresAt(),
-				LocalDateTime.now()
+				now
 		);
 		return new AuthResult(
 				accountRecord.accountId(),
@@ -112,17 +114,22 @@ public class AuthApplicationService {
 
 	private String issueRefreshSession(AccountRecord accountRecord) {
 		String refreshToken = opaqueRefreshTokenService.issueToken();
+		LocalDateTime now = utcNow();
 		refreshSessionStore.create(new RefreshSessionRecord(
 				opaqueRefreshTokenService.newSessionId(),
 				accountRecord.accountId(),
 				accountRecord.displayName(),
 				opaqueRefreshTokenService.hash(refreshToken),
 				opaqueRefreshTokenService.expiresAt(),
-				LocalDateTime.now(),
-				LocalDateTime.now(),
+				now,
+				now,
 				null
 		));
 		return refreshToken;
+	}
+
+	private LocalDateTime utcNow() {
+		return LocalDateTime.now(ZoneOffset.UTC);
 	}
 
 	private String normalizeAccount(String account) {

@@ -35,7 +35,7 @@ public class MybatisAccountStore implements AccountStore {
 		AccountEntity entity = new AccountEntity();
 		entity.setAccountId(accountRecord.accountId());
 		entity.setDisplayName(accountRecord.displayName());
-		entity.setPassword(accountRecord.password());
+		entity.setPasswordHash(accountRecord.passwordHash());
 		entity.setCreatedAt(LocalDateTime.now());
 		try {
 			accountMapper.insert(entity);
@@ -50,6 +50,6 @@ public class MybatisAccountStore implements AccountStore {
 		AccountEntity entity = accountMapper.selectOne(new LambdaQueryWrapper<AccountEntity>()
 				.eq(AccountEntity::getAccountId, accountId));
 		return Optional.ofNullable(entity)
-				.map(found -> new AccountRecord(found.getAccountId(), found.getDisplayName(), found.getPassword()));
+				.map(found -> new AccountRecord(found.getAccountId(), found.getDisplayName(), found.getPasswordHash()));
 	}
 }
