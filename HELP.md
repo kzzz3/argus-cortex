@@ -14,3 +14,8 @@ While most of the inheritance is fine, it also inherits unwanted elements like `
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+### Development baseline
+
+- `V1__create_text_im_schema.sql` is the canonical evolving baseline during active development.
+- If you change the baseline schema directly, reset the local development database before starting the app again.
+- `ARGUS_JWT_SECRET` must be provided with a real private value; example placeholders are intentionally rejected.
