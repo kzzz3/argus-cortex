@@ -75,20 +75,12 @@ public class MediaUploadSessionApplicationService {
         if (content == null) {
             throw new IllegalArgumentException("Upload payload is required.");
         }
-		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
-        MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
-        if (!session.accountId().equals(accountRecord.accountId())) {
-            throw new IllegalArgumentException("Upload session does not belong to the authenticated account.");
-        }
+		MediaUploadSession session = findOwnedSession(sessionId);
         long contentLength = content.length;
         if (contentLength > session.maxPayloadBytes()) {
             throw new IllegalArgumentException("Content length exceeds the allowed upload size.");
         }
-        String objectKey = session.objectKey();
-        if (objectKey == null || objectKey.isBlank()) {
-            throw new IllegalStateException("Upload session object key is missing.");
-        }
+        String objectKey = requireObjectKey(session);
         mediaContentStorage.store(objectKey, content);
         mediaUploadSessionStore.markUploaded(sessionId, objectKey);
     }
@@ -97,16 +89,12 @@ public class MediaUploadSessionApplicationService {
 			String sessionId,
 			FinalizeMediaUploadCommand request
 	) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
-        MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
-        if (!session.accountId().equals(accountRecord.accountId())) {
-            throw new IllegalArgumentException("Upload session does not belong to the authenticated account.");
-        }
+        MediaUploadSession session = findOwnedSession(sessionId);
         if (!session.uploaded()) {
             throw new IllegalStateException("Upload session content has not been uploaded.");
         }
-        if (!session.objectKey().equals(request.objectKey())) {
+        String objectKey = requireObjectKey(session);
+        if (!objectKey.equals(request.objectKey())) {
             throw new IllegalArgumentException("Upload session object key mismatch.");
         }
 
@@ -115,21 +103,39 @@ public class MediaUploadSessionApplicationService {
     }
 
 	public MediaAttachmentDownload loadAttachment(String attachmentId) {
-		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         MediaAttachmentRecord record = mediaAttachmentStore.findByAttachmentId(attachmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Media attachment not found."));
+        AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         if (!accountRecord.accountId().equals(record.accountId())) {
             throw new IllegalArgumentException("Attachment does not belong to the authenticated account.");
         }
-        String objectKey = record.objectKey();
-        if (objectKey == null || objectKey.isBlank()) {
-            throw new IllegalStateException("Attachment object key is missing.");
-        }
+        String objectKey = requireObjectKey(record.objectKey(), "Attachment object key is missing.");
         if (!mediaContentStorage.exists(objectKey)) {
             throw new IllegalStateException("Attachment content is missing.");
         }
         byte[] content = mediaContentStorage.read(objectKey);
         return new MediaAttachmentDownload(record, content);
+    }
+
+    private MediaUploadSession findOwnedSession(String sessionId) {
+        AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
+        MediaUploadSession session = mediaUploadSessionStore.findBySessionId(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload session not found."));
+        if (!session.accountId().equals(accountRecord.accountId())) {
+            throw new IllegalArgumentException("Upload session does not belong to the authenticated account.");
+        }
+        return session;
+    }
+
+    private String requireObjectKey(MediaUploadSession session) {
+        return requireObjectKey(session.objectKey(), "Upload session object key is missing.");
+    }
+
+    private String requireObjectKey(String objectKey, String errorMessage) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new IllegalStateException(errorMessage);
+        }
+        return objectKey;
     }
 
 	private MediaAttachmentRecord buildAttachmentRecord(MediaUploadSession session, FinalizeMediaUploadCommand request) {
