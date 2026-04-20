@@ -16,6 +16,15 @@ import org.springframework.stereotype.Component;
 public class RedisMediaUploadSessionStore implements MediaUploadSessionStore {
 
     private static final Duration SESSION_TTL = Duration.ofDays(1);
+    private static final String FIELD_SESSION_ID = "sessionId";
+    private static final String FIELD_ACCOUNT_ID = "accountId";
+    private static final String FIELD_ATTACHMENT_TYPE = "attachmentType";
+    private static final String FIELD_OBJECT_KEY = "objectKey";
+    private static final String FIELD_UPLOAD_URL = "uploadUrl";
+    private static final String FIELD_MAX_PAYLOAD_BYTES = "maxPayloadBytes";
+    private static final String FIELD_UPLOAD_TOKEN = "uploadToken";
+    private static final String FIELD_INSTRUCTIONS = "instructions";
+    private static final String FIELD_UPLOADED = "uploaded";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -26,16 +35,7 @@ public class RedisMediaUploadSessionStore implements MediaUploadSessionStore {
     @Override
     public MediaUploadSession save(MediaUploadSession session) {
         String key = redisKey(session.sessionId());
-        Map<String, String> payload = new HashMap<>();
-        payload.put("sessionId", session.sessionId());
-        payload.put("accountId", session.accountId());
-        payload.put("attachmentType", session.attachmentType().name());
-        payload.put("objectKey", session.objectKey());
-        payload.put("uploadUrl", session.uploadUrl());
-        payload.put("maxPayloadBytes", Long.toString(session.maxPayloadBytes()));
-        payload.put("uploadToken", session.uploadToken());
-        payload.put("instructions", session.instructions());
-        payload.put("uploaded", Boolean.toString(session.uploaded()));
+        Map<String, String> payload = serialize(session);
         redisTemplate.opsForHash().putAll(key, payload);
         redisTemplate.expire(key, SESSION_TTL);
         return session;
@@ -58,8 +58,8 @@ public class RedisMediaUploadSessionStore implements MediaUploadSessionStore {
         }
         String key = redisKey(sessionId);
         Map<String, String> updates = Map.of(
-                "objectKey", objectKey,
-                "uploaded", "true"
+                FIELD_OBJECT_KEY, objectKey,
+                FIELD_UPLOADED, Boolean.TRUE.toString()
         );
         redisTemplate.opsForHash().putAll(key, updates);
         redisTemplate.expire(key, SESSION_TTL);
@@ -71,23 +71,15 @@ public class RedisMediaUploadSessionStore implements MediaUploadSessionStore {
     }
 
     private MediaUploadSession mapToSession(Map<Object, Object> stored) {
-        String sessionId = String.valueOf(stored.get("sessionId"));
-        String accountId = String.valueOf(stored.get("accountId"));
-        MediaAttachmentType attachmentType = MediaAttachmentType.valueOf(String.valueOf(stored.get("attachmentType")));
-        String objectKey = null;
-        Object savedObjectKey = stored.get("objectKey");
-        if (savedObjectKey != null) {
-            objectKey = savedObjectKey.toString();
-        }
-        String uploadUrl = String.valueOf(stored.get("uploadUrl"));
-        long maxPayloadBytes = Long.parseLong(String.valueOf(stored.get("maxPayloadBytes")));
-        String uploadToken = String.valueOf(stored.get("uploadToken"));
-        String instructions = String.valueOf(stored.get("instructions"));
-        boolean uploaded = false;
-        Object uploadedField = stored.get("uploaded");
-        if (uploadedField != null) {
-            uploaded = Boolean.parseBoolean(uploadedField.toString());
-        }
+        String sessionId = requiredValue(stored, FIELD_SESSION_ID);
+        String accountId = requiredValue(stored, FIELD_ACCOUNT_ID);
+        MediaAttachmentType attachmentType = MediaAttachmentType.valueOf(requiredValue(stored, FIELD_ATTACHMENT_TYPE));
+        String objectKey = optionalValue(stored, FIELD_OBJECT_KEY);
+        String uploadUrl = requiredValue(stored, FIELD_UPLOAD_URL);
+        long maxPayloadBytes = Long.parseLong(requiredValue(stored, FIELD_MAX_PAYLOAD_BYTES));
+        String uploadToken = requiredValue(stored, FIELD_UPLOAD_TOKEN);
+        String instructions = requiredValue(stored, FIELD_INSTRUCTIONS);
+        boolean uploaded = Boolean.parseBoolean(optionalValue(stored, FIELD_UPLOADED));
         Map<String, String> uploadHeaders = Map.of(
                 "X-Upload-Session", sessionId,
                 "X-Attachment-Type", attachmentType.name()
@@ -108,5 +100,28 @@ public class RedisMediaUploadSessionStore implements MediaUploadSessionStore {
 
     private String redisKey(String sessionId) {
         return "argus:media-upload-session:" + sessionId;
+    }
+
+    private Map<String, String> serialize(MediaUploadSession session) {
+        Map<String, String> payload = new HashMap<>();
+        payload.put(FIELD_SESSION_ID, session.sessionId());
+        payload.put(FIELD_ACCOUNT_ID, session.accountId());
+        payload.put(FIELD_ATTACHMENT_TYPE, session.attachmentType().name());
+        payload.put(FIELD_OBJECT_KEY, session.objectKey());
+        payload.put(FIELD_UPLOAD_URL, session.uploadUrl());
+        payload.put(FIELD_MAX_PAYLOAD_BYTES, Long.toString(session.maxPayloadBytes()));
+        payload.put(FIELD_UPLOAD_TOKEN, session.uploadToken());
+        payload.put(FIELD_INSTRUCTIONS, session.instructions());
+        payload.put(FIELD_UPLOADED, Boolean.toString(session.uploaded()));
+        return payload;
+    }
+
+    private String requiredValue(Map<Object, Object> stored, String fieldName) {
+        return String.valueOf(stored.get(fieldName));
+    }
+
+    private String optionalValue(Map<Object, Object> stored, String fieldName) {
+        Object value = stored.get(fieldName);
+        return value == null ? null : value.toString();
     }
 }
