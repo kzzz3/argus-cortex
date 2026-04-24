@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -117,12 +118,9 @@ public class MybatisConversationStore implements ConversationStore {
 		requireThread(accountRecord.accountId(), conversationId);
 		String normalizedClientMessageId = clientMessageId == null || clientMessageId.isBlank() ? null : clientMessageId.trim();
 		if (normalizedClientMessageId != null) {
-			ConversationMessageEntity existing = messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
-					.eq(ConversationMessageEntity::getConversationId, conversationId)
-					.eq(ConversationMessageEntity::getSenderAccountId, accountRecord.accountId())
-					.eq(ConversationMessageEntity::getClientMessageId, normalizedClientMessageId));
+			ConversationMessageEntity existing = findByClientMessageId(conversationId, accountRecord.accountId(), normalizedClientMessageId);
 			if (existing != null) {
-				return toMessage(accountRecord.accountId(), existing);
+				return toMessage(accountRecord.accountId(), existing, true);
 			}
 		}
 
@@ -142,9 +140,26 @@ public class MybatisConversationStore implements ConversationStore {
 		entity.setStatusUpdatedAt(ConversationTimeFormatter.formatStatusUpdatedAt(statusUpdatedAt));
 		entity.setSequenceNo(nextSequence);
 		entity.setCreatedAt(createdAt);
-		messageMapper.insert(entity);
+		try {
+			messageMapper.insert(entity);
+		}
+		catch (DuplicateKeyException exception) {
+			ConversationMessageEntity existing = findByClientMessageId(conversationId, accountRecord.accountId(), entity.getClientMessageId());
+			if (existing != null) {
+				return toMessage(accountRecord.accountId(), existing, true);
+			}
+			throw exception;
+		}
 		advanceAllThreadCursors(conversationId, nextSequence, accountRecord.accountId());
 		return toMessage(accountRecord.accountId(), entity);
+	}
+
+	@Nullable
+	private ConversationMessageEntity findByClientMessageId(String conversationId, String senderAccountId, String clientMessageId) {
+		return messageMapper.selectOne(new LambdaQueryWrapper<ConversationMessageEntity>()
+				.eq(ConversationMessageEntity::getConversationId, conversationId)
+				.eq(ConversationMessageEntity::getSenderAccountId, senderAccountId)
+				.eq(ConversationMessageEntity::getClientMessageId, clientMessageId));
 	}
 
 	@Override
@@ -333,6 +348,10 @@ public class MybatisConversationStore implements ConversationStore {
 	}
 
 	private ConversationMessage toMessage(String viewerAccountId, ConversationMessageEntity entity) {
+		return toMessage(viewerAccountId, entity, false);
+	}
+
+	private ConversationMessage toMessage(String viewerAccountId, ConversationMessageEntity entity, boolean duplicateClientMessage) {
 		return new ConversationMessage(
 				entity.getId(),
 				entity.getConversationId(),
@@ -342,7 +361,8 @@ public class MybatisConversationStore implements ConversationStore {
 				viewerAccountId.equals(entity.getSenderAccountId()),
 				entity.getDeliveryStatus(),
 				entity.getStatusUpdatedAt(),
-				resolveAttachment(entity.getAttachmentId())
+				resolveAttachment(entity.getAttachmentId()),
+				duplicateClientMessage
 		);
 	}
 

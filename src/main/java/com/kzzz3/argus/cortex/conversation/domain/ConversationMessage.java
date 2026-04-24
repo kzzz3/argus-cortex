@@ -11,6 +11,20 @@ public record ConversationMessage(
 		boolean fromCurrentUser,
 		String deliveryStatus,
 		String statusUpdatedAt,
-		@Nullable ConversationMessageAttachment attachment
+		@Nullable ConversationMessageAttachment attachment,
+		boolean duplicateClientMessage
 ) {
+	public ConversationMessage(
+			String id,
+			String conversationId,
+			String senderDisplayName,
+			String body,
+			String timestampLabel,
+			boolean fromCurrentUser,
+			String deliveryStatus,
+			String statusUpdatedAt,
+			@Nullable ConversationMessageAttachment attachment
+	) {
+		this(id, conversationId, senderDisplayName, body, timestampLabel, fromCurrentUser, deliveryStatus, statusUpdatedAt, attachment, false);
+	}
 }

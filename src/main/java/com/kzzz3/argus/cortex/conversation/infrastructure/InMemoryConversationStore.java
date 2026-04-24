@@ -87,7 +87,7 @@ public class InMemoryConversationStore implements ConversationStore {
 		String normalizedClientMessageId = clientMessageId == null || clientMessageId.isBlank() ? null : clientMessageId.trim();
 		StoredConversationMessage existing = sharedConversationState.findByClientMessageId(accountRecord.accountId(), normalizedClientMessageId);
 		if (existing != null) {
-			return existing.toConversationMessage(accountRecord.accountId());
+			return existing.toConversationMessage(accountRecord.accountId(), true);
 		}
 
 		StoredConversationMessage message = sharedConversationState.addMessage(
@@ -431,6 +431,10 @@ public class InMemoryConversationStore implements ConversationStore {
 		}
 
 		private ConversationMessage toConversationMessage(String viewerAccountId) {
+			return toConversationMessage(viewerAccountId, false);
+		}
+
+		private ConversationMessage toConversationMessage(String viewerAccountId, boolean duplicateClientMessage) {
 			return new ConversationMessage(
 					id,
 					conversationId,
@@ -440,7 +444,8 @@ public class InMemoryConversationStore implements ConversationStore {
 					viewerAccountId.equals(senderAccountId),
 					deliveryStatus,
 					statusUpdatedAt,
-					attachment
+					attachment,
+					duplicateClientMessage
 			);
 		}
 
