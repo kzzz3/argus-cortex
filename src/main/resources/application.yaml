@@ -27,7 +27,7 @@ mybatis-plus:
 argus:
   auth:
     jwt:
-      secret: ${ARGUS_JWT_SECRET}
+      secret: ${ARGUS_JWT_SECRET:argus-cortex-local-dev-jwt-secret-please-overwrite-123456}
       ttl: ${ARGUS_JWT_TTL:PT168H}
       refresh-ttl: ${ARGUS_JWT_REFRESH_TTL:PT168H}
   persistence:
