@@ -257,7 +257,7 @@ class TextImFlowIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{"clientMessageId":"client-msg-1","body":"Hello Zhang San"}
-								"""))
+				"""))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(firstMessageId));
 

@@ -81,7 +81,9 @@ public class ConversationApplicationService {
                 normalizedBody,
                 attachment
         );
-        publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_CREATED, message);
+        if (!message.duplicateClientMessage()) {
+            publishRealtimeEvent(conversationId, ConversationRealtimeEventType.MESSAGE_CREATED, message);
+        }
         return message;
     }
 
