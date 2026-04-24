@@ -27,13 +27,15 @@ argus-cortex/
 ## COMMANDS
 ```bash
 ./mvnw test
-./mvnw spring-boot:run
 docker compose up -d
+./mvnw spring-boot:run
 ```
 
 ## CONVENTIONS
 - Build with the Maven wrapper, not an ad hoc local Maven invocation.
 - Configuration is environment-variable first. Preserve `${ARGUS_*}` driven settings instead of hardcoding environment-specific values.
+- Default runtime persistence is MySQL: keep `argus.persistence.mode` defaulting to `${ARGUS_PERSISTENCE_MODE:mysql}`. Do not switch production/default runtime to in-memory storage.
+- Start the local dependency stack, or otherwise provide MySQL/Redis equivalents, before using the default `spring-boot:run` path.
 - Flyway migration location is `classpath:db/migration`.
 - MyBatis Plus uses underscore-to-camel-case mapping; keep database/entity naming compatible with that behavior.
 - Tests use `src/test/resources/application.yaml` with H2 and in-memory persistence defaults.
@@ -54,5 +56,6 @@ docker compose up -d
 
 ## NOTES
 - `docker-compose.yml` defines the expected local dependency stack: MySQL, Redis, Kafka, Kafka UI, and MinIO.
+- `ARGUS_JWT_SECRET` should be supplied for real environments; local development may use the checked-in fallback only to avoid blocking startup before dependencies are reached.
 - `docs/project-plan.md` explicitly says Cortex is not the place for heavy media processing, direct sensor access, UI logic, or low-level secret-bearing crypto handling.
 - The largest backend hotspots are currently `conversation`, `auth`, and `payment`; keep module boundaries clear there.
