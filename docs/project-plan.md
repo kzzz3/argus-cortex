@@ -233,7 +233,7 @@ The global project is split into eight execution phases, but Cortex only owns th
 - [ ] replace seeded in-memory conversation/message responses with real structured persistence
 - [x] add sync cursor / recent-window continuation semantics instead of static list-only responses
 - [ ] add server-driven delivery receipt and read-state sync
-- [ ] add idempotent send semantics and duplicate suppression for message retries
+- [x] add idempotent send semantics and duplicate suppression for message retries
 - [ ] finalize friend-request workflow and direct-chat ownership rules for Stage 1
 
 ### 13.2 Media and realtime follow-up
