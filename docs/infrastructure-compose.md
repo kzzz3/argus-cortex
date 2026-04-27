@@ -32,13 +32,13 @@ The Spring Boot app already uses MySQL, Redis, Flyway, and local media storage t
 
 2. Adjust passwords/secrets in `.env`
 
-   Required values now include:
+   Required Compose values include:
 
    - `MYSQL_ROOT_PASSWORD`
    - `MYSQL_DATABASE`
    - `MYSQL_USER`
    - `MYSQL_PASSWORD`
-   - `ARGUS_JWT_SECRET` (replace the example placeholder with a private value of at least 32 characters; application startup intentionally fails without it)
+   - `ARGUS_JWT_SECRET` (keep this aligned with the value exported to the Spring Boot process; application startup intentionally fails without a real private value)
 
 3. Start the stack:
 
@@ -66,6 +66,15 @@ The Spring Boot app already uses MySQL, Redis, Flyway, and local media storage t
 This compose is intentionally **infra-only**.
 
 You start the supporting services in Docker, but keep `argus-cortex` itself running directly from your normal Java/Spring development or server process. Kafka UI is exposed at `http://localhost:8081` so the backend can continue to use its default `8080` port.
+
+Docker Compose loads `.env` for containers only. Before `./mvnw spring-boot:run`, export matching app-process values, for example:
+
+```powershell
+$env:ARGUS_MYSQL_URL = "jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
+$env:ARGUS_MYSQL_USERNAME = "argus"
+$env:ARGUS_MYSQL_PASSWORD = "argus_change_me"
+$env:ARGUS_JWT_SECRET = "replace-with-a-private-value-at-least-32-characters"
+```
 
 ## Recommended next infrastructure step
 
