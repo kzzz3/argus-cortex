@@ -24,6 +24,10 @@ class JwtSecretKeyProviderTest {
 				IllegalStateException.class,
 				() -> new JwtSecretKeyProvider("replace_with_a_private_jwt_secret_min_32_chars")
 		);
+		assertThrows(
+				IllegalStateException.class,
+				() -> new JwtSecretKeyProvider("argus-cortex-local-dev-jwt-secret-please-overwrite-123456")
+		);
 	}
 
 	@Test

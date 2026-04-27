@@ -344,10 +344,12 @@ class TextImFlowIntegrationTest {
 						.header("Authorization", bearer(accessToken))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"attachmentType":"IMAGE","fileName":"design-spec.png","estimatedBytes":12}
+								{"attachmentType":"image","fileName":"design-spec.png","estimatedBytes":12}
 								""".formatted(conversationId)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.sessionId").isNotEmpty())
+				.andExpect(jsonPath("$.maxPayloadBytes").value(5L * 1024L * 1024L))
+				.andExpect(jsonPath("$.uploadToken").isNotEmpty())
 				.andReturn();
 
 		JsonNode uploadSessionBody = objectMapper.readTree(uploadSessionResult.getResponse().getContentAsString());

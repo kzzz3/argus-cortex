@@ -27,12 +27,25 @@ mybatis-plus:
 argus:
   auth:
     jwt:
-      secret: ${ARGUS_JWT_SECRET:argus-cortex-local-dev-jwt-secret-please-overwrite-123456}
-      ttl: ${ARGUS_JWT_TTL:PT168H}
+      secret: ${ARGUS_JWT_SECRET:}
+      ttl: ${ARGUS_JWT_TTL:PT2H}
       refresh-ttl: ${ARGUS_JWT_REFRESH_TTL:PT168H}
+    rate-limit:
+      max-attempts: ${ARGUS_AUTH_RATE_LIMIT_MAX_ATTEMPTS:20}
+      window: ${ARGUS_AUTH_RATE_LIMIT_WINDOW:PT1M}
   persistence:
     mode: ${ARGUS_PERSISTENCE_MODE:mysql}
   media:
     storage:
       root-dir: ${ARGUS_MEDIA_STORAGE_ROOT:./var/media-storage}
       public-base-url: ${ARGUS_MEDIA_STORAGE_PUBLIC_BASE_URL:http://localhost:8080}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,5 +1,7 @@
 package com.kzzz3.argus.cortex.media.domain;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public enum MediaAttachmentType {
 
     IMAGE(5L * 1024 * 1024),
@@ -14,5 +16,13 @@ public enum MediaAttachmentType {
 
     public long defaultMaxPayloadBytes() {
         return maxPayloadBytes;
+    }
+
+    @JsonCreator
+    public static MediaAttachmentType fromJson(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Media attachment type is required.");
+        }
+        return MediaAttachmentType.valueOf(value.trim().toUpperCase());
     }
 }

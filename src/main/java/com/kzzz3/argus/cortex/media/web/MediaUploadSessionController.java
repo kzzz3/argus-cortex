@@ -65,8 +65,11 @@ public class MediaUploadSessionController {
             HttpServletRequest request
 	) {
         try {
-            byte[] content = request.getInputStream().readAllBytes();
-            mediaUploadSessionApplicationService.uploadContent(sessionId, content);
+            mediaUploadSessionApplicationService.uploadContent(
+                    sessionId,
+                    request.getInputStream(),
+                    request.getContentLengthLong()
+            );
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to read upload payload.", ex);
         }

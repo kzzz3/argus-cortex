@@ -2,6 +2,7 @@ package com.kzzz3.argus.cortex.shared.web;
 
 import com.kzzz3.argus.cortex.auth.domain.InvalidCredentialsException;
 import com.kzzz3.argus.cortex.auth.domain.RegistrationConflictException;
+import com.kzzz3.argus.cortex.auth.application.AuthRateLimitExceededException;
 import com.kzzz3.argus.cortex.conversation.domain.ConversationNotFoundException;
 import com.kzzz3.argus.cortex.conversation.domain.MessageNotFoundException;
 import com.kzzz3.argus.cortex.friend.domain.FriendAlreadyExistsException;
@@ -33,6 +34,12 @@ public class GlobalApiExceptionHandler {
 	public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException exception) {
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 				.body(new ApiErrorResponse("INVALID_CREDENTIALS", exception.getMessage()));
+	}
+
+	@ExceptionHandler(AuthRateLimitExceededException.class)
+	public ResponseEntity<ApiErrorResponse> handleAuthRateLimitExceeded(AuthRateLimitExceededException exception) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.body(new ApiErrorResponse("AUTH_RATE_LIMITED", exception.getMessage()));
 	}
 
 	@ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})

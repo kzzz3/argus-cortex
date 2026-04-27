@@ -9,6 +9,8 @@ import com.kzzz3.argus.cortex.media.domain.MediaUploadSession;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSessionStore;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaContentStorage;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaStorageProperties;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -43,8 +45,7 @@ public class MediaUploadSessionApplicationService {
 		AccountRecord accountRecord = authenticatedAccountResolver.resolveCurrent();
         String normalizedFileName = request.fileName().trim();
         MediaAttachmentType attachmentType = request.attachmentType();
-        long normalizedEstimatedBytes = Math.max(1, request.estimatedBytes());
-        long maxPayloadBytes = Math.max(attachmentType.defaultMaxPayloadBytes(), normalizedEstimatedBytes);
+        long maxPayloadBytes = attachmentType.defaultMaxPayloadBytes();
         String sessionId = generateSessionId(accountRecord.accountId(), normalizedFileName, attachmentType);
         String objectKey = generateObjectKey(accountRecord.accountId(), attachmentType, sessionId, normalizedFileName);
         String uploadUrl = buildUploadUrl(sessionId);
@@ -75,8 +76,17 @@ public class MediaUploadSessionApplicationService {
         if (content == null) {
             throw new IllegalArgumentException("Upload payload is required.");
         }
+		uploadContent(sessionId, new ByteArrayInputStream(content), content.length);
+    }
+
+	public void uploadContent(String sessionId, InputStream content, long contentLength) {
+        if (content == null) {
+            throw new IllegalArgumentException("Upload payload is required.");
+        }
 		MediaUploadSession session = findOwnedSession(sessionId);
-        long contentLength = content.length;
+        if (contentLength < 0) {
+            throw new IllegalArgumentException("Content length is required.");
+        }
         if (contentLength > session.maxPayloadBytes()) {
             throw new IllegalArgumentException("Content length exceeds the allowed upload size.");
         }
@@ -145,7 +155,7 @@ public class MediaUploadSessionApplicationService {
                 session.accountId(),
                 normalizeConversationId(request.conversationId()),
                 session.attachmentType(),
-                request.fileName(),
+                sanitizeFileName(request.fileName()),
                 request.contentType(),
                 request.contentLength(),
                 session.objectKey(),
@@ -175,7 +185,12 @@ public class MediaUploadSessionApplicationService {
         if (fileName == null || fileName.isBlank()) {
             return "upload";
         }
-        return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String sanitized = fileName.replace('\\', '_')
+                .replace('/', '_')
+                .replaceAll("[^a-zA-Z0-9._-]", "_")
+                .replaceAll("^[._]+", "")
+                .replaceAll("_+", "_");
+        return sanitized.isBlank() ? "upload" : sanitized;
     }
 
     private String buildUploadUrl(String sessionId) {

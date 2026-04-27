@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.kzzz3.argus.cortex.auth.application.AuthenticatedAccountResolver;
 import com.kzzz3.argus.cortex.auth.domain.AccountRecord;
+import com.kzzz3.argus.cortex.media.application.CreateMediaUploadSessionCommand;
+import com.kzzz3.argus.cortex.media.application.FinalizeMediaUploadCommand;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentRecord;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentStore;
 import com.kzzz3.argus.cortex.media.domain.MediaAttachmentType;
@@ -16,11 +18,67 @@ import com.kzzz3.argus.cortex.media.domain.MediaUploadSession;
 import com.kzzz3.argus.cortex.media.domain.MediaUploadSessionStore;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaContentStorage;
 import com.kzzz3.argus.cortex.media.infrastructure.MediaStorageProperties;
+import org.mockito.ArgumentCaptor;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class MediaUploadSessionApplicationServiceTest {
+
+    @Test
+    void createUploadSession_doesNotLetClientRaiseServerOwnedPayloadCap() {
+        MediaUploadSessionStore uploadSessionStore = mock(MediaUploadSessionStore.class);
+        MediaAttachmentStore attachmentStore = mock(MediaAttachmentStore.class);
+        MediaContentStorage mediaContentStorage = mock(MediaContentStorage.class);
+        MediaStorageProperties storageProperties = new MediaStorageProperties();
+        storageProperties.setPublicBaseUrl("https://media.example.com");
+
+        when(uploadSessionStore.save(org.mockito.ArgumentMatchers.any(MediaUploadSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        MediaUploadSessionApplicationService service = new MediaUploadSessionApplicationService(
+                resolver("tester"),
+                uploadSessionStore,
+                attachmentStore,
+                storageProperties,
+                mediaContentStorage
+        );
+
+        MediaUploadSession session = service.createUploadSession(
+                new CreateMediaUploadSessionCommand(MediaAttachmentType.IMAGE, "design-spec.png", Long.MAX_VALUE)
+        );
+
+        assertEquals(MediaAttachmentType.IMAGE.defaultMaxPayloadBytes(), session.maxPayloadBytes());
+    }
+
+    @Test
+    void finalizeUploadSession_sanitizesStoredFileNameToBasename() {
+        MediaUploadSessionStore uploadSessionStore = mock(MediaUploadSessionStore.class);
+        MediaAttachmentStore attachmentStore = mock(MediaAttachmentStore.class);
+        MediaContentStorage mediaContentStorage = mock(MediaContentStorage.class);
+        MediaStorageProperties storageProperties = new MediaStorageProperties();
+        storageProperties.setPublicBaseUrl("https://media.example.com");
+        when(uploadSessionStore.findBySessionId("session-1")).thenReturn(Optional.of(mediaSession("tester", true)));
+        when(mediaContentStorage.exists("media/object-key")).thenReturn(true);
+        when(attachmentStore.save(org.mockito.ArgumentMatchers.any(MediaAttachmentRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        MediaUploadSessionApplicationService service = new MediaUploadSessionApplicationService(
+                resolver("tester"),
+                uploadSessionStore,
+                attachmentStore,
+                storageProperties,
+                mediaContentStorage
+        );
+
+        MediaAttachmentRecord record = service.finalizeUploadSession(
+                "session-1",
+                new FinalizeMediaUploadCommand("../evil\\invoice.png", "image/png", 12L, "media/object-key", "conv-1")
+        );
+
+        assertEquals("evil_invoice.png", record.fileName());
+    }
 
     @Test
     void uploadContent_rejectsSessionOwnedByAnotherAccount() {
@@ -49,7 +107,7 @@ class MediaUploadSessionApplicationServiceTest {
     }
 
     @Test
-    void uploadContent_storesPayloadForOwnedSession() {
+    void uploadContent_storesPayloadForOwnedSession() throws Exception {
         MediaUploadSessionStore uploadSessionStore = mock(MediaUploadSessionStore.class);
         MediaAttachmentStore attachmentStore = mock(MediaAttachmentStore.class);
         MediaContentStorage mediaContentStorage = mock(MediaContentStorage.class);
@@ -69,7 +127,9 @@ class MediaUploadSessionApplicationServiceTest {
         byte[] content = new byte[] {1, 2, 3};
         service.uploadContent("session-1", content);
 
-        verify(mediaContentStorage).store("media/object-key", content);
+        ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+        verify(mediaContentStorage).store(org.mockito.ArgumentMatchers.eq("media/object-key"), streamCaptor.capture());
+        assertArrayEquals(content, streamCaptor.getValue().readAllBytes());
         verify(uploadSessionStore).markUploaded("session-1", "media/object-key");
     }
 

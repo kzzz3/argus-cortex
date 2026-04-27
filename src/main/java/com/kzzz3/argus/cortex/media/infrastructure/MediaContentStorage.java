@@ -1,8 +1,10 @@
 package com.kzzz3.argus.cortex.media.infrastructure;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import org.springframework.stereotype.Component;
@@ -27,6 +29,22 @@ public class MediaContentStorage {
                 Files.createDirectories(parent);
             }
             Files.write(destination, content, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to persist uploaded media content.", ex);
+        }
+    }
+
+    public void store(String objectKey, InputStream content) {
+        Path destination = resolvePath(objectKey, "storing");
+        if (content == null) {
+            throw new IllegalArgumentException("Content stream is required for storing media content.");
+        }
+        try {
+            Path parent = destination.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.copy(content, destination, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to persist uploaded media content.", ex);
         }
