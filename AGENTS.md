@@ -6,6 +6,9 @@
 ## STRUCTURE
 ```text
 argus-cortex/
+├── README.md
+├── PLAN.md
+├── AGENTS.md
 ├── pom.xml
 ├── docker-compose.yml
 ├── docs/
@@ -22,12 +25,14 @@ argus-cortex/
 | Runtime config | `src/main/resources/application.yaml` | Env-driven backend defaults |
 | Schema changes | `src/main/resources/db/migration/` | Flyway migration files |
 | Tests | `src/test/java/`, `src/test/resources/application.yaml` | H2 + in-memory test baseline |
+| Onboarding and active plan | `README.md`, `PLAN.md` | Setup, navigation, current checklist, verification gates |
 | Project intent | `docs/project-plan.md`, `docs/retina-cortex-contract.md`, `HELP.md` | Domain ownership and constraints |
 
 ## COMMANDS
 ```bash
 ./mvnw test
 docker compose up -d
+# Before spring-boot:run, export ARGUS_MYSQL_URL / ARGUS_MYSQL_USERNAME / ARGUS_MYSQL_PASSWORD / ARGUS_JWT_SECRET for the Maven process.
 ./mvnw spring-boot:run
 ```
 
@@ -40,6 +45,14 @@ docker compose up -d
 - MyBatis Plus uses underscore-to-camel-case mapping; keep database/entity naming compatible with that behavior.
 - Tests use `src/test/resources/application.yaml` with H2, in-memory persistence defaults, and an explicit test-only JWT secret.
 - `HELP.md` defines `V1__create_text_im_schema.sql` as the canonical evolving baseline during active development.
+
+## DOCUMENTATION WORKFLOW
+- `README.md` is the Cortex onboarding guide for environment setup, infra, tests, and runtime commands.
+- `PLAN.md` is the active Cortex task plan, risk register, and verification ledger.
+- `docs/project-plan.md` remains the long-form product/architecture blueprint; do not duplicate active checklist state there unless the blueprint itself changes.
+- `docs/infrastructure-compose.md` remains the local infrastructure reference and must stay aligned with `docker-compose.yml` and `.env.example`.
+- For non-trivial work, update `PLAN.md` before editing and complete Modify -> Review/Evaluate -> Document -> Cleanup before marking a task done.
+- Documentation changes should accompany code changes whenever APIs, schemas, runtime config, infra ports, or verification gates change.
 
 ## ANTI-PATTERNS
 - Do not add Android/UI/device logic here.
@@ -56,6 +69,7 @@ docker compose up -d
 
 ## NOTES
 - `docker-compose.yml` defines the expected local dependency stack: MySQL, Redis, Kafka, Kafka UI, and MinIO.
-- `ARGUS_JWT_SECRET` is required for application startup. Blank values, example placeholders, and the old local fallback are intentionally rejected; copy `.env.example` and replace the placeholder before running the app.
+- `.env` is consumed by Docker Compose; when running Spring Boot directly, export matching `ARGUS_MYSQL_*` variables plus `ARGUS_JWT_SECRET` into the app process.
+- `ARGUS_JWT_SECRET` is required for application startup. Blank values, example placeholders, and the old local fallback are intentionally rejected.
 - `docs/project-plan.md` explicitly says Cortex is not the place for heavy media processing, direct sensor access, UI logic, or low-level secret-bearing crypto handling.
 - The largest backend hotspots are currently `conversation`, `auth`, and `payment`; keep module boundaries clear there.
