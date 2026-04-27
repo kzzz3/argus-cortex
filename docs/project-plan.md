@@ -202,8 +202,8 @@ The global project is split into eight execution phases, but Cortex only owns th
 - [x] auth module is structured as web / application / domain / infrastructure
 - [x] validation and shared API error handling are in place
 - [x] account registration and login endpoints exist
-- [x] in-memory account storage is in place for the current stage
-- [x] bearer token issuance is in place
+- [x] account/session storage is available through the current persistence boundary, with in-memory fakes reserved for tests and local slices
+- [x] bearer token issuance, expiry, refresh TTL, and fail-fast JWT secret validation are in place
 
 ### 12.2 Completed auth/session chain work
 - [x] token issuance evolved into token-backed session lookup (`AccessTokenStore`)
@@ -238,12 +238,12 @@ The global project is split into eight execution phases, but Cortex only owns th
 
 ### 13.2 Media and realtime follow-up
 - [x] SSE event streams now emit stable event ids, heartbeat frames, and reconnect resume support via Last-Event-ID
-- [ ] add upload-session creation APIs for image / voice / video payloads
+- [x] add upload-session creation APIs for image / voice / video payloads
 - [x] add media metadata records and attachment references in message envelopes
 - [ ] add RTC signaling APIs for 1v1 audio/video sessions
 
 ### 13.3 Reliability and security follow-up
-- [ ] define token lifecycle / expiry / refresh instead of current in-memory stage tokens
+- [x] define token lifecycle / expiry / refresh instead of current in-memory stage tokens
 - [ ] move auth/session state from in-memory-only token store to a persistence-backed design
 - [x] add reconnect-aware diff sync and cursor validation rules
 - [ ] add explicit offline-window / retention policy beyond the current placeholder recent-window contract
@@ -252,6 +252,6 @@ The global project is split into eight execution phases, but Cortex only owns th
 
 1. define structured persistence for conversation metadata, message envelopes, and recall/read-state transitions
 2. define Sync-Key / timeline cursor semantics and conflict policy for bounded-window sync
-3. define upload-session contracts for voice/image/video payloads
+3. define durable media retention and cleanup policy around uploaded attachment objects
 4. define WebRTC signaling schema and session lifecycle events
 5. define typed action schema for Stage 2 AI orchestration once Stage 1 message sync semantics are stable

@@ -38,7 +38,7 @@ docker compose up -d
 - Start the local dependency stack, or otherwise provide MySQL/Redis equivalents, before using the default `spring-boot:run` path.
 - Flyway migration location is `classpath:db/migration`.
 - MyBatis Plus uses underscore-to-camel-case mapping; keep database/entity naming compatible with that behavior.
-- Tests use `src/test/resources/application.yaml` with H2 and in-memory persistence defaults.
+- Tests use `src/test/resources/application.yaml` with H2, in-memory persistence defaults, and an explicit test-only JWT secret.
 - `HELP.md` defines `V1__create_text_im_schema.sql` as the canonical evolving baseline during active development.
 
 ## ANTI-PATTERNS
@@ -51,11 +51,11 @@ docker compose up -d
 
 ## TESTING
 - Primary test tree mirrors production packages under `src/test/java`.
-- Common backend test style uses handwritten fakes/in-memory implementations rather than a visible mocking framework.
+- Common backend test style uses handwritten fakes/in-memory implementations. Mockito is acceptable for narrow interaction tests where a fake would obscure the contract being verified.
 - Keep persistence-sensitive tests aligned with the H2 + Flyway test profile.
 
 ## NOTES
 - `docker-compose.yml` defines the expected local dependency stack: MySQL, Redis, Kafka, Kafka UI, and MinIO.
-- `ARGUS_JWT_SECRET` should be supplied for real environments; local development may use the checked-in fallback only to avoid blocking startup before dependencies are reached.
+- `ARGUS_JWT_SECRET` is required for application startup. Blank values, example placeholders, and the old local fallback are intentionally rejected; copy `.env.example` and replace the placeholder before running the app.
 - `docs/project-plan.md` explicitly says Cortex is not the place for heavy media processing, direct sensor access, UI logic, or low-level secret-bearing crypto handling.
 - The largest backend hotspots are currently `conversation`, `auth`, and `payment`; keep module boundaries clear there.
