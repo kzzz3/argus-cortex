@@ -195,63 +195,8 @@ The global project is split into eight execution phases, but Cortex only owns th
 - no low-level VAD, OpenCV filtering, or mbedtls signing here
 - no heavy codec pipeline inside the cloud monolith
 
-## 12. Current Progress Checklist
+## 12. Planning and Progress Source of Truth
 
-### 12.1 Completed Stage 1 backend foundation
-- [x] Spring Boot baseline and module-first package layout are in place
-- [x] auth module is structured as web / application / domain / infrastructure
-- [x] validation and shared API error handling are in place
-- [x] account registration and login endpoints exist
-- [x] account/session storage is available through the current persistence boundary, with in-memory fakes reserved for tests and local slices
-- [x] bearer token issuance, expiry, refresh TTL, and fail-fast JWT secret validation are in place
+This document is the long-form Cortex product and architecture blueprint. Active checklist state, immediate tasks, verification gates, and the current risk register live in the repository-level `PLAN.md`.
 
-### 12.2 Completed auth/session chain work
-- [x] token issuance evolved into token-backed session lookup (`AccessTokenStore`)
-- [x] `/api/v1/auth/session/me` exists for session restoration
-- [x] backend auth now supports the Android client restoring a prior session instead of only fresh login
-
-### 12.3 Completed first IM chain slices
-- [x] `/api/v1/conversations` exists as the first remote conversation list endpoint
-- [x] `/api/v1/conversations/{id}/messages` exists as the first remote message list endpoint
-- [x] `/api/v1/conversations/{id}/messages` POST exists for remote message send
-- [x] `/api/v1/conversations/{id}/messages/{messageId}/recall` POST exists for remote recall
-- [x] conversation and message list endpoints now expose recent-window semantics instead of pretending to be unbounded full-history truth
-- [x] `/api/v1/conversations/{id}/messages` now supports real cursor continuation across multiple reconnect pages
-- [x] conversation messages can now carry structured attachment references instead of body-only file metadata
-
-### 12.4 Completed repo-level validation work
-- [x] backend test suite continues to pass after the auth/session/conversation endpoint additions
-- [x] current Android remote auth and conversation slices can compile against these backend contracts
-- [x] shared bearer-token parsing and authenticated-account resolution are centralized instead of being repeated across controllers and services
-- [x] application services now accept application-layer commands rather than importing web request DTOs directly
-- [x] development schema now uses a single v1 Flyway baseline migration instead of a forward-compatibility migration chain
-- [x] conversation/friend stores no longer auto-seed demo contacts or sample threads; empty state now means truly empty persisted state
-
-## 13. Next-Phase Checklist
-
-### 13.1 IM backend priorities before calling the baseline complete
-- [ ] replace seeded in-memory conversation/message responses with real structured persistence
-- [x] add sync cursor / recent-window continuation semantics instead of static list-only responses
-- [ ] add server-driven delivery receipt and read-state sync
-- [x] add idempotent send semantics and duplicate suppression for message retries
-- [ ] finalize friend-request workflow and direct-chat ownership rules for Stage 1
-
-### 13.2 Media and realtime follow-up
-- [x] SSE event streams now emit stable event ids, heartbeat frames, and reconnect resume support via Last-Event-ID
-- [x] add upload-session creation APIs for image / voice / video payloads
-- [x] add media metadata records and attachment references in message envelopes
-- [ ] add RTC signaling APIs for 1v1 audio/video sessions
-
-### 13.3 Reliability and security follow-up
-- [x] define token lifecycle / expiry / refresh instead of current in-memory stage tokens
-- [ ] move auth/session state from in-memory-only token store to a persistence-backed design
-- [x] add reconnect-aware diff sync and cursor validation rules
-- [ ] add explicit offline-window / retention policy beyond the current placeholder recent-window contract
-
-## 14. Immediate Next Design Tasks
-
-1. define structured persistence for conversation metadata, message envelopes, and recall/read-state transitions
-2. define Sync-Key / timeline cursor semantics and conflict policy for bounded-window sync
-3. define durable media retention and cleanup policy around uploaded attachment objects
-4. define WebRTC signaling schema and session lifecycle events
-5. define typed action schema for Stage 2 AI orchestration once Stage 1 message sync semantics are stable
+When architecture changes, update this blueprint. When implementation status changes, update `PLAN.md` and only mirror durable architectural conclusions here.
