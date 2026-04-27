@@ -3,7 +3,7 @@
 ## Included services
 
 - **MySQL** — primary relational store for identity, social graph, conversation metadata, and transaction records
-- **Redis** — hot session/presence/routing state plus rate limits and locks
+- **Redis** — hot upload-session state plus future presence/routing/rate-limit coordination
 - **Kafka** — async fan-out, notifications, analytics, and future risk pipelines
 - **Kafka UI** — operational visibility for Kafka topics/messages
 - **MinIO** — S3-compatible object storage for voice/image/video assets and thumbnails
@@ -17,12 +17,11 @@
 ## What is not included yet
 
 - `argus-cortex` application containerization
-- `argus-cortex` application runtime wiring to these services
 - Netty IM gateway sidecar or separate gateway container
 - model serving / AI provider containers
 - payment/risk external adapters
 
-Those belong to later phases once the current Spring Boot module actually starts consuming the infra.
+The Spring Boot app already uses MySQL, Redis, Flyway, and local media storage through normal application configuration. This compose file remains infra-only: start these services in Docker, then run the app from the usual Java/Spring process.
 
 ## Usage
 
@@ -39,7 +38,7 @@ Those belong to later phases once the current Spring Boot module actually starts
    - `MYSQL_DATABASE`
    - `MYSQL_USER`
    - `MYSQL_PASSWORD`
-   - `ARGUS_JWT_SECRET` (use a private value with at least 32 characters)
+   - `ARGUS_JWT_SECRET` (replace the example placeholder with a private value of at least 32 characters; application startup intentionally fails without it)
 
 3. Start the stack:
 
@@ -66,13 +65,12 @@ Those belong to later phases once the current Spring Boot module actually starts
 
 This compose is intentionally **infra-only**.
 
-You start the supporting services in Docker, but keep `argus-cortex` itself running directly from your normal Java/Spring development or server process.
+You start the supporting services in Docker, but keep `argus-cortex` itself running directly from your normal Java/Spring development or server process. Kafka UI is exposed at `http://localhost:8081` so the backend can continue to use its default `8080` port.
 
 ## Recommended next infrastructure step
 
-Once `argus-cortex` starts using these dependencies for real, add:
+Next, add the missing operational polish around this infra:
 
 - Spring profiles / `application-local.yaml`
 - Docker health-aware app startup dependency wiring
-- database schema migration tooling (Flyway or Liquibase)
 - topic/bootstrap scripts for Kafka
