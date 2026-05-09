@@ -101,7 +101,6 @@ argus-cortex/
 - `PLAN.md` tracks active backend work and verification gates.
 - `docs/project-plan.md` remains the long-form product/architecture blueprint.
 - `docs/infrastructure-compose.md` remains the local infra reference.
-- `HELP.md` is narrow generated/help context; do not duplicate onboarding there.
 
 ## Verification Log
 

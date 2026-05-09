@@ -27,7 +27,7 @@ mybatis-plus:
 argus:
   auth:
     jwt:
-      secret: ${ARGUS_JWT_SECRET:}
+      secret: ${ARGUS_JWT_SECRET:local-dev-jwt-secret-not-for-production-use-2026}
       ttl: ${ARGUS_JWT_TTL:PT2H}
       refresh-ttl: ${ARGUS_JWT_REFRESH_TTL:PT168H}
     rate-limit:

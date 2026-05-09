@@ -67,14 +67,7 @@ This compose is intentionally **infra-only**.
 
 You start the supporting services in Docker, but keep `argus-cortex` itself running directly from your normal Java/Spring development or server process. Kafka UI is exposed at `http://localhost:8081` so the backend can continue to use its default `8080` port.
 
-Docker Compose loads `.env` for containers only. Before `./mvnw spring-boot:run`, export matching app-process values, for example:
-
-```powershell
-$env:ARGUS_MYSQL_URL = "jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
-$env:ARGUS_MYSQL_USERNAME = "argus"
-$env:ARGUS_MYSQL_PASSWORD = "argus_change_me"
-$env:ARGUS_JWT_SECRET = "replace-with-a-private-value-at-least-32-characters"
-```
+Docker Compose loads `.env` for containers only. The Spring Boot app reads `ARGUS_*` environment variables with sensible local defaults already configured in `application.yaml`. To override, export matching app-process values before launch.
 
 ## Recommended next infrastructure step
 

@@ -66,29 +66,21 @@ Local service endpoints:
 
 ### Test and Run
 
-Before running the app directly, export the application environment so it matches the local Compose services.
-
-PowerShell:
-
-```powershell
-$env:ARGUS_MYSQL_URL = "jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
-$env:ARGUS_MYSQL_USERNAME = "argus"
-$env:ARGUS_MYSQL_PASSWORD = "argus_change_me"
-$env:ARGUS_JWT_SECRET = "replace-with-a-private-value-at-least-32-characters"
-```
-
-Unix-like shells:
-
-```bash
-export ARGUS_MYSQL_URL='jdbc:mysql://localhost:3306/argus_cortex?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai'
-export ARGUS_MYSQL_USERNAME='argus'
-export ARGUS_MYSQL_PASSWORD='argus_change_me'
-export ARGUS_JWT_SECRET='replace-with-a-private-value-at-least-32-characters'
-```
+Start dependencies first, then run directly:
 
 ```bash
 ./mvnw test
 ./mvnw spring-boot:run
+```
+
+The app reads `ARGUS_*` environment variables with sensible local defaults in `application.yaml`. To override for production or staging, export the relevant variables before launch. Example:
+
+```powershell
+$env:ARGUS_JWT_SECRET = "replace-with-a-private-value-at-least-32-characters"
+```
+
+```bash
+export ARGUS_JWT_SECRET='replace-with-a-private-value-at-least-32-characters'
 ```
 
 ## Project Navigation
@@ -96,7 +88,6 @@ export ARGUS_JWT_SECRET='replace-with-a-private-value-at-least-32-characters'
 | Need | File / directory |
 |---|---|
 | Active work plan | `PLAN.md` |
-| Local agent rules | `AGENTS.md` |
 | Product/architecture plan | `docs/project-plan.md` |
 | Local infra guide | `docs/infrastructure-compose.md` |
 | Retina/Cortex contract | `docs/retina-cortex-contract.md` |
